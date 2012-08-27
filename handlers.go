@@ -169,6 +169,15 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func deleteDB(parts []string, w http.ResponseWriter, req *http.Request) {
+	err := dbdelete(parts[0])
+	if err == nil {
+		mustEncode(200, w, map[string]interface{}{"ok": true})
+	} else {
+		emitError(500, w, "Error deleting DB", err.Error())
+	}
+}
+
 // TODO:
 
 func dbInfo(parts []string, w http.ResponseWriter, req *http.Request) {
@@ -176,10 +185,6 @@ func dbInfo(parts []string, w http.ResponseWriter, req *http.Request) {
 }
 
 func dbChanges(parts []string, w http.ResponseWriter, req *http.Request) {
-	notImplemented(parts, w, req)
-}
-
-func deleteDB(parts []string, w http.ResponseWriter, req *http.Request) {
 	notImplemented(parts, w, req)
 }
 

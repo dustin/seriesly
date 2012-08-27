@@ -42,6 +42,10 @@ func dbcreate(path string) error {
 	return nil
 }
 
+func dbdelete(dbname string) error {
+	return os.Remove(dbPath(dbname))
+}
+
 func dblist(root string) []string {
 	rv := []string{}
 	filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
@@ -61,7 +65,7 @@ func dbstore(dbname string, k string, body []byte) error {
 	defer db.Close()
 	defer db.Commit()
 
-	return db.Set(couchstore.NewDocInfo(k, 0),
+	return db.Set(couchstore.NewDocInfo(k, couchstore.DocIsCompressed),
 		couchstore.NewDocument(k, string(body)))
 }
 
