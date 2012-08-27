@@ -112,13 +112,14 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 	chunk := int64(time.Duration(group) * time.Second)
 
-	collection := make([][]*string, len(ptrs))
+	infos := []*couchstore.DocInfo{}
 	prevg := int64(0)
 
-	output := map[string]interface{}{}
+	ch := make(chan processOut, 10)
+	chunks := 0
 
-	err = db.WalkDocs(from, func(d *couchstore.Couchstore,
-		di couchstore.DocInfo, doc couchstore.Document) error {
+	err = db.Walk(from, func(d *couchstore.Couchstore,
+		di *couchstore.DocInfo) error {
 		if to != "" && di.ID() >= to {
 			return couchstore.StopIteration
 		}
@@ -126,29 +127,37 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		k := parseKey(di.ID())
 		g := (k / chunk) * chunk
 
-		if g != prevg && len(collection[0]) > 0 {
+		if g != prevg && len(infos) > 0 {
 			log.Printf("Emitting at %v with %v items!",
-				prevg, len(collection[0]))
+				prevg, len(infos))
 
-			reduced := reduce(collection, reds)
-			log.Printf("Reduced: %v", reduced)
-			output[strconv.FormatInt(prevg/1e9, 10)] = reduced
+			chunks++
+			go process_docs(args[0], prevg, infos, ptrs, reds, ch)
 
-			collection = make([][]*string, len(ptrs))
+			infos = infos[:0]
 		}
+		infos = append(infos, di)
 		prevg = g
-
-		processDoc(collection, doc.Value(), ptrs)
 
 		return nil
 	})
 	if err != nil {
 		emitError(500, w, "Error traversing DB", err.Error())
 	} else {
-		if len(collection[0]) > 0 {
-			reduced := reduce(collection, reds)
-			log.Printf("Reduced: %v", reduced)
-			output[strconv.FormatInt(prevg/1e9, 10)] = reduced
+		if len(infos) > 0 {
+			chunks++
+			go process_docs(args[0], prevg, infos, ptrs, reds, ch)
+		}
+
+		output := map[string]interface{}{}
+
+		for i := 0; i < chunks; i++ {
+			po := <-ch
+			if po.err != nil {
+				emitError(500, w, "Error traversing DB", po.err.Error())
+				return
+			}
+			output[strconv.FormatInt(po.key/1e9, 10)] = po.value
 		}
 
 		e := json.NewEncoder(w)

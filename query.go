@@ -7,10 +7,18 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-jsonpointer"
 )
 
+type processOut struct {
+	key   int64
+	value interface{}
+	err   error
+}
+
 func processDoc(collection [][]*string, doc string, ptrs []string) {
+
 	j := map[string]interface{}{}
 	err := json.Unmarshal([]byte(doc), &j)
 	if err != nil {
@@ -32,6 +40,38 @@ func processDoc(collection [][]*string, doc string, ptrs []string) {
 			collection[i] = append(collection[i], nil)
 		}
 	}
+}
+
+func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
+	ptrs []string, reds []Reducer, ch chan<- processOut) {
+
+	log.Printf("Processing %v keys", len(infos))
+
+	result := processOut{key, nil, nil}
+
+	db, err := dbopen(dbname)
+	if err != nil {
+		result.err = err
+		ch <- result
+		return
+	}
+	defer db.Close()
+
+	collection := make([][]*string, len(ptrs))
+
+	for _, di := range infos {
+		doc, err := db.GetFromDocInfo(di)
+		if err == nil {
+			processDoc(collection, doc.Value(), ptrs)
+		} else {
+			for i := range collection {
+				collection[i] = append(collection[i], nil)
+			}
+		}
+	}
+
+	result.value = reduce(collection, reds)
+	ch <- result
 }
 
 type Reducer func(input []*string) interface{}
