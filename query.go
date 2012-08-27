@@ -116,6 +116,9 @@ func convertToint64(in []*string) []int64 {
 }
 
 var reducers = map[string]Reducer{
+	"identity": func(input []*string) interface{} {
+		return input
+	},
 	"any": func(input []*string) interface{} {
 		for _, v := range input {
 			if v != nil {

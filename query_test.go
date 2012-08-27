@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -26,11 +27,12 @@ func TestReducers(t *testing.T) {
 		{"max", int64(63)},
 		{"min", int64(31)},
 		{"avg", 94.0 / 2.0},
+		{"identity", testInput},
 	}
 
 	for _, test := range tests {
 		got := reducers[test.reducer](testInput)
-		if got != test.exp {
+		if !reflect.DeepEqual(got, test.exp) {
 			t.Errorf("Expected %v for %v, got %v",
 				test.exp, test.reducer, got)
 			t.Fail()
