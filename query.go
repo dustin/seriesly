@@ -143,6 +143,13 @@ var reducers = map[string]Reducer{
 		}
 		return rv
 	},
+	"sumsq": func(input []*string) interface{} {
+		rv := int64(0)
+		for _, v := range convertToint64(input) {
+			rv += (v * v)
+		}
+		return rv
+	},
 	"max": func(input []*string) interface{} {
 		rv := int64(math.MinInt64)
 		for _, v := range convertToint64(input) {
