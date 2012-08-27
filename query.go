@@ -17,6 +17,15 @@ type processOut struct {
 	err   error
 }
 
+type processIn struct {
+	dbname string
+	key    int64
+	infos  []*couchstore.DocInfo
+	ptrs   []string
+	reds   []Reducer
+	out    chan<- processOut
+}
+
 func processDoc(collection [][]*string, doc string, ptrs []string) {
 
 	j := map[string]interface{}{}
@@ -73,6 +82,15 @@ func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
 	result.value = reduce(collection, reds)
 	ch <- result
 }
+
+func docProcessor(ch <-chan processIn) {
+	for pi := range ch {
+		process_docs(pi.dbname, pi.key, pi.infos, pi.ptrs,
+			pi.reds, pi.out)
+	}
+}
+
+var processorInput chan processIn
 
 type Reducer func(input []*string) interface{}
 

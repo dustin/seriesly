@@ -10,6 +10,7 @@ import (
 )
 
 var dbRoot = flag.String("root", "db", "Root directory for database files.")
+var queryWorkers = flag.Int("workers", 10, "Number of query workers.")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 
@@ -93,6 +94,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 func main() {
 	addr := flag.String("addr", ":3133", "Address to bind to")
 	flag.Parse()
+
+	processorInput = make(chan processIn, *queryWorkers)
+	for i := 0; i < *queryWorkers; i++ {
+		go docProcessor(processorInput)
+	}
 
 	s := &http.Server{
 		Addr:    *addr,

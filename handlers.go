@@ -115,7 +115,8 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	infos := []*couchstore.DocInfo{}
 	prevg := int64(0)
 
-	ch := make(chan processOut, 10)
+	ch := make(chan processOut, *queryWorkers)
+	defer close(ch)
 	chunks := 0
 
 	err = db.Walk(from, func(d *couchstore.Couchstore,
@@ -132,7 +133,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 				prevg, len(infos))
 
 			chunks++
-			go process_docs(args[0], prevg, infos, ptrs, reds, ch)
+			processorInput <- processIn{args[0], prevg, infos, ptrs, reds, ch}
 
 			infos = infos[:0]
 		}
@@ -146,7 +147,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	} else {
 		if len(infos) > 0 {
 			chunks++
-			go process_docs(args[0], prevg, infos, ptrs, reds, ch)
+			processorInput <- processIn{args[0], prevg, infos, ptrs, reds, ch}
 		}
 
 		output := map[string]interface{}{}
