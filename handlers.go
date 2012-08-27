@@ -132,7 +132,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 			reduced := reduce(collection, reds)
 			log.Printf("Reduced: %v", reduced)
-			output[strconv.FormatInt(g/1e9, 10)] = reduced
+			output[strconv.FormatInt(prevg/1e9, 10)] = reduced
 
 			collection = make([][]*string, len(ptrs))
 		}
@@ -145,6 +145,12 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		emitError(500, w, "Error traversing DB", err.Error())
 	} else {
+		if len(collection[0]) > 0 {
+			reduced := reduce(collection, reds)
+			log.Printf("Reduced: %v", reduced)
+			output[strconv.FormatInt(prevg/1e9, 10)] = reduced
+		}
+
 		e := json.NewEncoder(w)
 		err := e.Encode(output)
 		if err != nil {
