@@ -100,12 +100,12 @@ var reducers = map[string]Reducer{
 		}
 		return rv
 	},
-}
-
-func init() {
-	reducers["avg"] = func(input []*string) interface{} {
-		sum := reducers["sum"](input).(int64)
-		count := reducers["count"](input).(int)
-		return float64(sum) / float64(count)
-	}
+	"avg": func(input []*string) interface{} {
+		nums := convertToint64(input)
+		sum := int64(0)
+		for _, v := range nums {
+			sum += v
+		}
+		return float64(sum) / float64(len(nums))
+	},
 }
