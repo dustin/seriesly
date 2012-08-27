@@ -1,10 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/dustin/go-couchstore"
 )
 
 func serverInfo(parts []string, w http.ResponseWriter, req *http.Request) {
@@ -64,6 +69,87 @@ func putDocument(args []string, w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(201)
 	} else {
 		emitError(500, w, "Error storing data", err.Error())
+	}
+}
+
+func query(args []string, w http.ResponseWriter, req *http.Request) {
+	// Parse the params
+
+	req.ParseForm()
+
+	group, err := strconv.Atoi(req.FormValue("group"))
+	if err != nil {
+		emitError(400, w, "Bad group value", err.Error())
+		return
+	}
+
+	from := req.FormValue("from")
+	to := req.FormValue("to")
+
+	ptrs := req.Form["ptr"]
+	reds := make([]Reducer, 0, len(ptrs))
+	for _, r := range req.Form["reducer"] {
+		f, ok := reducers[r]
+		if !ok {
+			emitError(400, w, "No such reducer", r)
+			return
+		}
+		reds = append(reds, f)
+	}
+	if len(ptrs) != len(reds) {
+		emitError(400, w, "Parameter mismatch",
+			"Must supply the same number of pointers and reducers")
+		return
+	}
+
+	// Open the DB and do the work.
+
+	db, err := dbopen(args[0])
+	if err != nil {
+		emitError(500, w, "Error opening DB", err.Error())
+	}
+	defer db.Close()
+
+	chunk := int64(time.Duration(group) * time.Second)
+
+	collection := make([][]*string, len(ptrs))
+	prevg := int64(0)
+
+	output := map[string]interface{}{}
+
+	err = db.WalkDocs(from, func(d *couchstore.Couchstore,
+		di couchstore.DocInfo, doc couchstore.Document) error {
+		if to != "" && di.ID() >= to {
+			return couchstore.StopIteration
+		}
+
+		k := parseKey(di.ID())
+		g := (k / chunk) * chunk
+
+		if g != prevg && len(collection[0]) > 0 {
+			log.Printf("Emitting at %v with %v items!",
+				prevg, len(collection[0]))
+
+			reduced := reduce(collection, reds)
+			log.Printf("Reduced: %v", reduced)
+			output[strconv.FormatInt(g/1e9, 10)] = reduced
+
+			collection = make([][]*string, len(ptrs))
+		}
+		prevg = g
+
+		processDoc(collection, doc.Value(), ptrs)
+
+		return nil
+	})
+	if err != nil {
+		emitError(500, w, "Error traversing DB", err.Error())
+	} else {
+		e := json.NewEncoder(w)
+		err := e.Encode(output)
+		if err != nil {
+			emitError(500, w, "Error encoding output", err.Error())
+		}
 	}
 }
 

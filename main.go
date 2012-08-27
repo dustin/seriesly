@@ -29,6 +29,7 @@ var routingTable []routingEntry = []routingEntry{
 	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/?$"), dbInfo},
 	routingEntry{"HEAD", regexp.MustCompile("^/(" + dbMatch + ")/?$"), checkDB},
 	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_changes$"), dbChanges},
+	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_query$"), query},
 	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/?$"), createDB},
 	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/?$"), deleteDB},
 	routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/?$"), newDocument},

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dustin/go-couchstore"
 )
@@ -62,4 +63,12 @@ func dbstore(dbname string, k string, body []byte) error {
 
 	return db.Set(couchstore.NewDocInfo(k, 0),
 		couchstore.NewDocument(k, string(body)))
+}
+
+func parseKey(s string) int64 {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		return -1
+	}
+	return t.UnixNano()
 }
