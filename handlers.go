@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -48,8 +49,12 @@ func checkDB(args []string, w http.ResponseWriter, req *http.Request) {
 }
 
 func newDocument(args []string, w http.ResponseWriter, req *http.Request) {
-	var k string
-	fk := req.FormValue("ts")
+	var k, fk string
+	form, err := url.ParseQuery(req.URL.RawQuery)
+	if err == nil {
+		fk = form.Get("ts")
+	}
+
 	if fk == "" {
 		k = time.Now().UTC().Format(time.RFC3339Nano)
 	} else {
