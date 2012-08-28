@@ -48,7 +48,18 @@ func checkDB(args []string, w http.ResponseWriter, req *http.Request) {
 }
 
 func newDocument(args []string, w http.ResponseWriter, req *http.Request) {
-	k := time.Now().UTC().Format(time.RFC3339Nano)
+	var k string
+	fk := req.FormValue("ts")
+	if fk == "" {
+		k = time.Now().UTC().Format(time.RFC3339Nano)
+	} else {
+		t, err := parseTime(fk)
+		if err != nil {
+			emitError(400, w, "Bad time format", err.Error())
+			return
+		}
+		k = t.UTC().Format(time.RFC3339Nano)
+	}
 	putDocument([]string{args[0], k}, w, req)
 }
 
