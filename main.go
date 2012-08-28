@@ -88,6 +88,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	route, hparts := findHandler(req.Method, req.URL.Path)
 	log.Printf("Handling %v:%v", req.Method, req.URL.Path)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-type", "application/json")
 	route.Handler(hparts, w, req)
 }
 
