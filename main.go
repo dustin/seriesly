@@ -7,10 +7,15 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"time"
 )
 
 var dbRoot = flag.String("root", "db", "Root directory for database files.")
 var queryWorkers = flag.Int("workers", 10, "Number of query workers.")
+var flushTime = flag.Duration("flushDelay", time.Second*5,
+	"Maximum amount of time to wait before flushing")
+var maxOpQueue = flag.Int("maxopqueue", 1000,
+	"Maximum number of queued items before flushing")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 

@@ -11,8 +11,6 @@ import (
 	"github.com/dustin/go-couchstore"
 )
 
-const maxOpQueue = 1000
-
 type dbOperation uint8
 
 const (
@@ -102,9 +100,7 @@ func dbWriteLoop(dq *dbWriter) {
 	defer bulk.Close()
 	defer bulk.Commit()
 
-	flushTime := time.Second * 5
-
-	t := time.NewTimer(flushTime)
+	t := time.NewTimer(*flushTime)
 
 	for {
 		select {
@@ -123,12 +119,12 @@ func dbWriteLoop(dq *dbWriter) {
 				log.Panicf("Unhandled case: %v", qi.op)
 			}
 			queued++
-			if queued > maxOpQueue {
+			if queued > *maxOpQueue {
 				log.Printf("Flushing %d items on queue")
 				bulk.Commit()
 				queued = 0
 				t.Stop()
-				t = time.NewTimer(flushTime)
+				t = time.NewTimer(*flushTime)
 			}
 		case <-t.C:
 			if queued > 0 {
@@ -136,7 +132,7 @@ func dbWriteLoop(dq *dbWriter) {
 				bulk.Commit()
 				queued = 0
 			}
-			t = time.NewTimer(flushTime)
+			t = time.NewTimer(*flushTime)
 		}
 	}
 }
