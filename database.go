@@ -119,8 +119,8 @@ func dbWriteLoop(dq *dbWriter) {
 				log.Panicf("Unhandled case: %v", qi.op)
 			}
 			queued++
-			if queued > *maxOpQueue {
-				log.Printf("Flushing %d items on queue")
+			if queued >= *maxOpQueue {
+				log.Printf("Flushing %d items on queue", queued)
 				bulk.Commit()
 				queued = 0
 				t.Stop()
