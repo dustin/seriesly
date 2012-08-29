@@ -88,6 +88,17 @@ func putDocument(args []string, w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func cleanupRangeParam(in, def string) (string, error) {
+	if in == "" {
+		return def, nil
+	}
+	t, err := parseTime(in)
+	if err != nil {
+		return in, err
+	}
+	return t.Format(time.RFC3339Nano), nil
+}
+
 func query(args []string, w http.ResponseWriter, req *http.Request) {
 	// Parse the params
 
@@ -99,8 +110,16 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	from := req.FormValue("from")
-	to := req.FormValue("to")
+	from, err := cleanupRangeParam(req.FormValue("from"), "")
+	if err != nil {
+		emitError(400, w, "Bad from value: %v", err.Error())
+		return
+	}
+	to, err := cleanupRangeParam(req.FormValue("to"), "")
+	if err != nil {
+		emitError(400, w, "Bad to value: %v", err.Error())
+		return
+	}
 
 	ptrs := req.Form["ptr"]
 	reds := make([]Reducer, 0, len(ptrs))

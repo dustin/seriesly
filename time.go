@@ -15,6 +15,11 @@ var timeFormats = []string{
 	time.UnixDate,
 	time.ANSIC,
 	time.RubyDate,
+	"2006-01-02T15:04",
+	"2006-01-02T15",
+	"2006-01-02",
+	"2006-01",
+	"2006",
 }
 
 var unparseableTimestamp = errors.New("unparsable timestamp")
@@ -30,7 +35,7 @@ func parseTime(in string) (time.Time, error) {
 		case n > int64(math.MaxInt32):
 			// millisecond timestamps
 			return time.Unix(n/1000, (n%1000)*1e6), nil
-		default:
+		case n > 10000:
 			// second timestamps
 			return time.Unix(n, 0), nil
 		}
