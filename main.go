@@ -25,7 +25,7 @@ type routingEntry struct {
 	Handler routeHandler
 }
 
-const dbMatch = "[-%+()$_a-z0-9]+"
+const dbMatch = "[-%+()$_a-zA-Z0-9]+"
 
 var routingTable []routingEntry = []routingEntry{
 	routingEntry{"GET", regexp.MustCompile("^/$"), serverInfo},
