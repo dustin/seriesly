@@ -144,6 +144,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	db, err := dbopen(args[0])
 	if err != nil {
 		emitError(500, w, "Error opening DB", err.Error())
+		return
 	}
 	defer db.Close()
 
