@@ -147,7 +147,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	}
 	defer db.Close()
 
-	chunk := int64(time.Duration(group) * time.Second)
+	chunk := int64(time.Duration(group) * time.Millisecond)
 
 	infos := []*couchstore.DocInfo{}
 	prevg := int64(0)
@@ -206,7 +206,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 				emitError(500, w, "Error traversing DB", po.err.Error())
 				return
 			}
-			output[strconv.FormatInt(po.key/1e9, 10)] = po.value
+			output[strconv.FormatInt(po.key/1e6, 10)] = po.value
 		case err = <-cherr:
 			going = false
 		}
