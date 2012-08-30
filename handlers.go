@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/dustin/go-couchstore"
+	"github.com/dustin/go-humanize"
 )
 
 func serverInfo(parts []string, w http.ResponseWriter, req *http.Request) {
@@ -151,52 +153,72 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	prevg := int64(0)
 
 	ch := make(chan processOut, *queryWorkers)
+	cherr := make(chan error)
 	defer close(ch)
-	chunks := 0
+	defer close(cherr)
+	var started, finished int32
+	var totalKeys int
 
-	err = db.Walk(from, func(d *couchstore.Couchstore,
-		di *couchstore.DocInfo) error {
-		if to != "" && di.ID() >= to {
-			return couchstore.StopIteration
-		}
+	start := time.Now()
 
-		k := parseKey(di.ID())
-		g := (k / chunk) * chunk
+	go func() {
+		wstart := time.Now()
+		err := db.Walk(from, func(d *couchstore.Couchstore,
+			di *couchstore.DocInfo) error {
+			if to != "" && di.ID() >= to {
+				return couchstore.StopIteration
+			}
 
-		if g != prevg && len(infos) > 0 {
-			log.Printf("Emitting at %v with %v items!",
-				prevg, len(infos))
+			k := parseKey(di.ID())
+			g := (k / chunk) * chunk
+			totalKeys++
 
-			chunks++
+			if g != prevg && len(infos) > 0 {
+				atomic.AddInt32(&started, 1)
+				processorInput <- processIn{args[0], prevg, infos, ptrs, reds, ch}
+
+				infos = infos[:0]
+			}
+			infos = append(infos, di)
+			prevg = g
+
+			return nil
+		})
+
+		if err == nil && len(infos) > 0 {
+			atomic.AddInt32(&started, 1)
 			processorInput <- processIn{args[0], prevg, infos, ptrs, reds, ch}
-
-			infos = infos[:0]
-		}
-		infos = append(infos, di)
-		prevg = g
-
-		return nil
-	})
-	if err != nil {
-		emitError(500, w, "Error traversing DB", err.Error())
-	} else {
-		if len(infos) > 0 {
-			chunks++
-			processorInput <- processIn{args[0], prevg, infos, ptrs, reds, ch}
 		}
 
-		output := map[string]interface{}{}
+		cherr <- err
 
-		for chunks > 0 {
-			po := <-ch
-			chunks--
+		log.Printf("Walk completed in %v", time.Since(wstart))
+	}()
+
+	output := map[string]interface{}{}
+	going := true
+
+	for err == nil && (going || (started-finished) > 0) {
+		select {
+		case po := <-ch:
+			atomic.AddInt32(&finished, 1)
 			if po.err != nil {
 				emitError(500, w, "Error traversing DB", po.err.Error())
 				return
 			}
 			output[strconv.FormatInt(po.key/1e9, 10)] = po.value
+		case err = <-cherr:
+			going = false
 		}
+	}
 
+	log.Printf("Completed query processing in %v, %v keys, %v chunks",
+		time.Since(start), humanize.Comma(int64(totalKeys)),
+		humanize.Comma(int64(started)))
+
+	if err != nil {
+		emitError(500, w, "Error traversing DB", err.Error())
+	} else {
 		e := json.NewEncoder(w)
 		err := e.Encode(output)
 		if err != nil {
