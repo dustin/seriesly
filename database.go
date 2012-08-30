@@ -148,7 +148,7 @@ func dbWriteFun(dbname string) (*dbWriter, error) {
 	}
 
 	writer := &dbWriter{
-		make(chan dbqitem),
+		make(chan dbqitem, *maxOpQueue),
 		make(chan bool),
 		db,
 	}
