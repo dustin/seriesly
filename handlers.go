@@ -187,8 +187,9 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 		output := map[string]interface{}{}
 
-		for i := 0; i < chunks; i++ {
+		for chunks > 0 {
 			po := <-ch
+			chunks--
 			if po.err != nil {
 				emitError(500, w, "Error traversing DB", po.err.Error())
 				return
