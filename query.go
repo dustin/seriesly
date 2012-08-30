@@ -102,11 +102,11 @@ func reduce(collection [][]*string, reducers []Reducer) []interface{} {
 	return rv
 }
 
-func convertToint64(in []*string) []int64 {
-	rv := make([]int64, 0, len(in))
+func convertTofloat64(in []*string) []float64 {
+	rv := make([]float64, 0, len(in))
 	for _, v := range in {
 		if v != nil {
-			x, err := strconv.ParseInt(*v, 10, 64)
+			x, err := strconv.ParseFloat(*v, 64)
 			if err == nil {
 				rv = append(rv, x)
 			}
@@ -137,22 +137,22 @@ var reducers = map[string]Reducer{
 		return rv
 	},
 	"sum": func(input []*string) interface{} {
-		rv := int64(0)
-		for _, v := range convertToint64(input) {
+		rv := float64(0)
+		for _, v := range convertTofloat64(input) {
 			rv += v
 		}
 		return rv
 	},
 	"sumsq": func(input []*string) interface{} {
-		rv := int64(0)
-		for _, v := range convertToint64(input) {
+		rv := float64(0)
+		for _, v := range convertTofloat64(input) {
 			rv += (v * v)
 		}
 		return rv
 	},
 	"max": func(input []*string) interface{} {
-		rv := int64(math.MinInt64)
-		for _, v := range convertToint64(input) {
+		rv := float64(math.MinInt64)
+		for _, v := range convertTofloat64(input) {
 			if v > rv {
 				rv = v
 			}
@@ -160,8 +160,8 @@ var reducers = map[string]Reducer{
 		return rv
 	},
 	"min": func(input []*string) interface{} {
-		rv := int64(math.MaxInt64)
-		for _, v := range convertToint64(input) {
+		rv := float64(math.MaxInt64)
+		for _, v := range convertTofloat64(input) {
 			if v < rv {
 				rv = v
 			}
@@ -169,8 +169,8 @@ var reducers = map[string]Reducer{
 		return rv
 	},
 	"avg": func(input []*string) interface{} {
-		nums := convertToint64(input)
-		sum := int64(0)
+		nums := convertTofloat64(input)
+		sum := float64(0)
 		for _, v := range nums {
 			sum += v
 		}

@@ -33,10 +33,10 @@ func TestReducers(t *testing.T) {
 	}{
 		{"any", "31"},
 		{"count", 3},
-		{"sum", int64(94)},
-		{"sumsq", int64(4930)},
-		{"max", int64(63)},
-		{"min", int64(31)},
+		{"sum", float64(94)},
+		{"sumsq", float64(4930)},
+		{"max", float64(63)},
+		{"min", float64(31)},
 		{"avg", 94.0 / 2.0},
 		{"identity", testInput},
 	}
