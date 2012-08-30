@@ -120,16 +120,20 @@ func dbWriteLoop(dq *dbWriter) {
 			}
 			queued++
 			if queued >= *maxOpQueue {
-				log.Printf("Flushing %d items on queue", queued)
+				start := time.Now()
 				bulk.Commit()
+				log.Printf("Flush of %d items took %v",
+					queued, time.Since(start))
 				queued = 0
 				t.Stop()
 				t = time.NewTimer(*flushTime)
 			}
 		case <-t.C:
 			if queued > 0 {
-				log.Printf("Flushing %d items on a timer", queued)
+				start := time.Now()
 				bulk.Commit()
+				log.Printf("Flush of %d items from timer took %v",
+					queued, time.Since(start))
 				queued = 0
 			}
 			t = time.NewTimer(*flushTime)
