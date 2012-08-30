@@ -54,8 +54,6 @@ func processDoc(collection [][]*string, doc string, ptrs []string) {
 func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
 	ptrs []string, reds []Reducer, ch chan<- processOut) {
 
-	log.Printf("Processing %v keys", len(infos))
-
 	result := processOut{key, nil, nil}
 
 	db, err := dbopen(dbname)
@@ -80,6 +78,7 @@ func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
 	}
 
 	result.value = reduce(collection, reds)
+
 	ch <- result
 }
 
