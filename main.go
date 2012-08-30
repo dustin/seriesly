@@ -16,6 +16,7 @@ var flushTime = flag.Duration("flushDelay", time.Second*5,
 	"Maximum amount of time to wait before flushing")
 var maxOpQueue = flag.Int("maxopqueue", 1000,
 	"Maximum number of queued items before flushing")
+var staticPath = flag.String("static", "static", "Path to static data")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 
@@ -29,6 +30,7 @@ const dbMatch = "[-%+()$_a-zA-Z0-9]+"
 
 var routingTable []routingEntry = []routingEntry{
 	routingEntry{"GET", regexp.MustCompile("^/$"), serverInfo},
+	routingEntry{"GET", regexp.MustCompile("^/_static/(.*)"), staticHandler},
 	// Database stuff
 	routingEntry{"GET", regexp.MustCompile("^/_all_dbs$"), listDatabases},
 	routingEntry{"GET", regexp.MustCompile("^/_(.*)"), reservedHandler},
@@ -58,6 +60,12 @@ func mustEncode(status int, w http.ResponseWriter, ob interface{}) {
 func emitError(status int, w http.ResponseWriter, e, reason string) {
 	m := map[string]string{"error": e, "reason": reason}
 	mustEncode(status, w, m)
+}
+
+func staticHandler(parts []string, w http.ResponseWriter, req *http.Request) {
+	w.Header().Del("Content-type")
+	http.StripPrefix("/_static/",
+		http.FileServer(http.Dir(*staticPath))).ServeHTTP(w, req)
 }
 
 func reservedHandler(parts []string, w http.ResponseWriter, req *http.Request) {
