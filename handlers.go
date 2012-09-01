@@ -98,7 +98,7 @@ func cleanupRangeParam(in, def string) (string, error) {
 	if err != nil {
 		return in, err
 	}
-	return t.Format(time.RFC3339Nano), nil
+	return t.UTC().Format(time.RFC3339Nano), nil
 }
 
 func query(args []string, w http.ResponseWriter, req *http.Request) {
