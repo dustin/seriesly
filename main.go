@@ -116,8 +116,9 @@ func main() {
 	}
 
 	s := &http.Server{
-		Addr:    *addr,
-		Handler: http.HandlerFunc(handler),
+		Addr:        *addr,
+		Handler:     http.HandlerFunc(handler),
+		ReadTimeout: 5 * time.Second,
 	}
 	log.Printf("Listening to web requests on %s", *addr)
 	log.Fatal(s.ListenAndServe())
