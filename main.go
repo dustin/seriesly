@@ -20,6 +20,8 @@ var maxOpQueue = flag.Int("maxOpQueue", 1000,
 var staticPath = flag.String("static", "static", "Path to static data")
 var queryTimeout = flag.Duration("maxQueryTime", time.Minute*5,
 	"Maximum amount of time a query is allowed to process.")
+var queryBacklog = flag.Int("queryBacklog", 100, "Query scan/group backlog size")
+var docBacklog = flag.Int("docBacklog", 1000, "MR group request backlog size")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 
@@ -155,12 +157,12 @@ func main() {
 		log.Fatalf("Programming error:  Could not find query handler")
 	}
 
-	processorInput = make(chan processIn, *docWorkers)
+	processorInput = make(chan processIn, *docBacklog)
 	for i := 0; i < *docWorkers; i++ {
 		go docProcessor(processorInput)
 	}
 
-	queryInput = make(chan *queryIn, *queryWorkers)
+	queryInput = make(chan *queryIn, *queryBacklog)
 	for i := 0; i < *queryWorkers; i++ {
 		go queryExecutor(queryInput)
 	}
