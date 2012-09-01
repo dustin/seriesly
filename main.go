@@ -23,30 +23,47 @@ var queryTimeout = flag.Duration("maxQueryTime", time.Minute*5,
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 
 type routingEntry struct {
-	Method  string
-	Path    *regexp.Regexp
-	Handler routeHandler
+	Method   string
+	Path     *regexp.Regexp
+	Handler  routeHandler
+	Deadline time.Duration
 }
 
 const dbMatch = "[-%+()$_a-zA-Z0-9]+"
 
+var defaultDeadline = time.Millisecond * 50
+
 var routingTable []routingEntry = []routingEntry{
-	routingEntry{"GET", regexp.MustCompile("^/$"), serverInfo},
-	routingEntry{"GET", regexp.MustCompile("^/_static/(.*)"), staticHandler},
+	routingEntry{"GET", regexp.MustCompile("^/$"),
+		serverInfo, defaultDeadline},
+	routingEntry{"GET", regexp.MustCompile("^/_static/(.*)"),
+		staticHandler, defaultDeadline},
 	// Database stuff
-	routingEntry{"GET", regexp.MustCompile("^/_all_dbs$"), listDatabases},
-	routingEntry{"GET", regexp.MustCompile("^/_(.*)"), reservedHandler},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/?$"), dbInfo},
-	routingEntry{"HEAD", regexp.MustCompile("^/(" + dbMatch + ")/?$"), checkDB},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_changes$"), dbChanges},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_query$"), query},
-	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/?$"), createDB},
-	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/?$"), deleteDB},
-	routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/?$"), newDocument},
+	routingEntry{"GET", regexp.MustCompile("^/_all_dbs$"),
+		listDatabases, defaultDeadline},
+	routingEntry{"GET", regexp.MustCompile("^/_(.*)"),
+		reservedHandler, defaultDeadline},
+	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+		dbInfo, defaultDeadline},
+	routingEntry{"HEAD", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+		checkDB, defaultDeadline},
+	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_changes$"),
+		dbChanges, defaultDeadline},
+	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_query$"),
+		query, *queryTimeout},
+	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+		createDB, defaultDeadline},
+	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+		deleteDB, defaultDeadline},
+	routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+		newDocument, defaultDeadline},
 	// Document stuff
-	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"), putDocument},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"), getDocument},
-	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"), rmDocument},
+	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
+		putDocument, defaultDeadline},
+	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
+		getDocument, defaultDeadline},
+	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
+		rmDocument, defaultDeadline},
 }
 
 func mustEncode(status int, w http.ResponseWriter, ob interface{}) {
@@ -96,18 +113,19 @@ func findHandler(method, path string) (routingEntry, []string) {
 			}
 		}
 	}
-	return routingEntry{"DEFAULT", nil, defaultHandler}, []string{}
+	return routingEntry{"DEFAULT", nil, defaultHandler, defaultDeadline},
+		[]string{}
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	start := time.Now()
-	maxTime := time.Millisecond * 250
-	wd := time.AfterFunc(maxTime, func() {
-		log.Printf("%v:%v is taking longer than %v",
-			req.Method, req.URL.Path, maxTime)
-	})
 	route, hparts := findHandler(req.Method, req.URL.Path)
+	wd := time.AfterFunc(route.Deadline, func() {
+		log.Printf("%v:%v is taking longer than %v",
+			req.Method, req.URL.Path, route.Deadline)
+	})
+
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-type", "application/json")
 	route.Handler(hparts, w, req)
@@ -121,6 +139,20 @@ func handler(w http.ResponseWriter, req *http.Request) {
 func main() {
 	addr := flag.String("addr", ":3133", "Address to bind to")
 	flag.Parse()
+
+	// Update the query handler deadline to the query timeout
+	found := false
+	for i := range routingTable {
+		matches := routingTable[i].Path.FindAllStringSubmatch("/x/_query", 1)
+		if len(matches) > 0 {
+			routingTable[i].Deadline = *queryTimeout
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Fatalf("Programming error:  Could not find query handler")
+	}
 
 	processorInput = make(chan processIn, *queryWorkers)
 	for i := 0; i < *queryWorkers; i++ {
