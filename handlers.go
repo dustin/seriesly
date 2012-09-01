@@ -146,7 +146,6 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	output := map[string]interface{}{}
 	going := true
 	finished := int32(0)
-	start := time.Now()
 
 	if err == nil {
 		for going || (q.started-finished) > 0 {
@@ -164,7 +163,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	}
 
 	log.Printf("Completed query processing in %v, %v keys, %v chunks",
-		time.Since(start), humanize.Comma(int64(q.totalKeys)),
+		time.Since(q.start), humanize.Comma(int64(q.totalKeys)),
 		humanize.Comma(int64(q.started)))
 
 	if err != nil {

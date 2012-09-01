@@ -39,6 +39,7 @@ type queryIn struct {
 	group     int
 	ptrs      []string
 	reds      []Reducer
+	start     time.Time
 	before    time.Time
 	started   int32
 	totalKeys int32
@@ -174,6 +175,8 @@ func queryExecutor(ch <-chan *queryIn) {
 func executeQuery(dbname, from, to string, group int,
 	ptrs []string, reds []Reducer) *queryIn {
 
+	now := time.Now()
+
 	rv := &queryIn{
 		dbname: dbname,
 		from:   from,
@@ -181,7 +184,8 @@ func executeQuery(dbname, from, to string, group int,
 		group:  group,
 		ptrs:   ptrs,
 		reds:   reds,
-		before: time.Now().Add(*queryTimeout),
+		start:  now,
+		before: now.Add(*queryTimeout),
 		out:    make(chan processOut, *queryWorkers),
 		cherr:  make(chan error),
 	}
