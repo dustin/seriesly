@@ -164,7 +164,6 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	before := start.Add(*queryTimeout)
 
 	go func() {
-		wstart := time.Now()
 		err := db.Walk(from, func(d *couchstore.Couchstore,
 			di *couchstore.DocInfo) error {
 			if to != "" && di.ID() >= to {
@@ -195,8 +194,6 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		}
 
 		cherr <- err
-
-		log.Printf("Walk completed in %v", time.Since(wstart))
 	}()
 
 	output := map[string]interface{}{}
