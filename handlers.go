@@ -161,6 +161,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	var totalKeys int
 
 	start := time.Now()
+	before := start.Add(*queryTimeout)
 
 	go func() {
 		wstart := time.Now()
@@ -176,7 +177,8 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 			if g != prevg && len(infos) > 0 {
 				atomic.AddInt32(&started, 1)
-				processorInput <- processIn{args[0], prevg, infos, ptrs, reds, ch}
+				processorInput <- processIn{args[0], prevg, infos, ptrs, reds,
+					before, ch}
 
 				infos = infos[:0]
 			}
@@ -188,7 +190,8 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 		if err == nil && len(infos) > 0 {
 			atomic.AddInt32(&started, 1)
-			processorInput <- processIn{args[0], prevg, infos, ptrs, reds, ch}
+			processorInput <- processIn{args[0], prevg, infos, ptrs, reds,
+				before, ch}
 		}
 
 		cherr <- err
@@ -199,17 +202,18 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	output := map[string]interface{}{}
 	going := true
 
-	for err == nil && (going || (started-finished) > 0) {
-		select {
-		case po := <-ch:
-			atomic.AddInt32(&finished, 1)
-			if po.err != nil {
-				emitError(500, w, "Error traversing DB", po.err.Error())
-				return
+	if err == nil {
+		for going || (started-finished) > 0 {
+			select {
+			case po := <-ch:
+				atomic.AddInt32(&finished, 1)
+				if po.err != nil {
+					err = po.err
+				}
+				output[strconv.FormatInt(po.key/1e6, 10)] = po.value
+			case err = <-cherr:
+				going = false
 			}
-			output[strconv.FormatInt(po.key/1e6, 10)] = po.value
-		case err = <-cherr:
-			going = false
 		}
 	}
 
@@ -218,6 +222,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		humanize.Comma(int64(started)))
 
 	if err != nil {
+		log.Printf("Error processing query: %v", err)
 		emitError(500, w, "Error traversing DB", err.Error())
 	} else {
 		e := json.NewEncoder(w)

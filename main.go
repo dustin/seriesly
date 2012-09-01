@@ -17,6 +17,8 @@ var flushTime = flag.Duration("flushDelay", time.Second*5,
 var maxOpQueue = flag.Int("maxOpQueue", 1000,
 	"Maximum number of queued items before flushing")
 var staticPath = flag.String("static", "static", "Path to static data")
+var queryTimeout = flag.Duration("maxQueryTime", time.Minute*5,
+	"Maximum amount of time a query is allowed to process.")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 

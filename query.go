@@ -2,14 +2,18 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
 	"strconv"
+	"time"
 
 	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-jsonpointer"
 )
+
+var timeoutError = errors.New("query timed out")
 
 type processOut struct {
 	key   int64
@@ -23,6 +27,7 @@ type processIn struct {
 	infos  []*couchstore.DocInfo
 	ptrs   []string
 	reds   []Reducer
+	before time.Time
 	out    chan<- processOut
 }
 
@@ -84,8 +89,12 @@ func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
 
 func docProcessor(ch <-chan processIn) {
 	for pi := range ch {
-		process_docs(pi.dbname, pi.key, pi.infos, pi.ptrs,
-			pi.reds, pi.out)
+		if time.Now().Before(pi.before) {
+			process_docs(pi.dbname, pi.key, pi.infos, pi.ptrs,
+				pi.reds, pi.out)
+		} else {
+			pi.out <- processOut{pi.key, nil, timeoutError}
+		}
 	}
 }
 
