@@ -84,10 +84,14 @@ func dbdelete(dbname string) error {
 func dblist(root string) []string {
 	rv := []string{}
 	filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
-		if !info.IsDir() && strings.HasSuffix(p, ".couch") {
-			rv = append(rv, dbBase(p))
+		if err == nil {
+			if !info.IsDir() && strings.HasSuffix(p, ".couch") {
+				rv = append(rv, dbBase(p))
+			}
+		} else {
+			log.Printf("Error on %#v: %v", p, err)
 		}
-		return err
+		return nil
 	})
 	return rv
 }
