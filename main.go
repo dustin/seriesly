@@ -99,11 +99,21 @@ func findHandler(method, path string) (routingEntry, []string) {
 
 func handler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
+	start := time.Now()
+	maxTime := time.Millisecond * 250
+	wd := time.AfterFunc(maxTime, func() {
+		log.Printf("%v:%v is taking longer than %v",
+			req.Method, req.URL.Path, maxTime)
+	})
 	route, hparts := findHandler(req.Method, req.URL.Path)
-	// log.Printf("Handling %v:%v", req.Method, req.URL.Path)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-type", "application/json")
 	route.Handler(hparts, w, req)
+
+	if !wd.Stop() {
+		log.Printf("%v:%v eventually finished in %v",
+			req.Method, req.URL.Path, time.Since(start))
+	}
 }
 
 func main() {
