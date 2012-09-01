@@ -8,10 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync/atomic"
 	"time"
 
-	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-humanize"
 )
 
@@ -139,84 +137,35 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	q := executeQuery(args[0], from, to, group, ptrs, reds)
+	defer close(q.out)
+	defer close(q.cherr)
+
 	// Open the DB and do the work.
-
-	db, err := dbopen(args[0])
-	if err != nil {
-		emitError(500, w, "Error opening DB", err.Error())
-		return
-	}
-	defer db.Close()
-
-	chunk := int64(time.Duration(group) * time.Millisecond)
-
-	infos := []*couchstore.DocInfo{}
-	prevg := int64(0)
-
-	ch := make(chan processOut, *queryWorkers)
-	cherr := make(chan error)
-	defer close(ch)
-	defer close(cherr)
-	var started, finished int32
-	var totalKeys int
-
-	start := time.Now()
-	before := start.Add(*queryTimeout)
-
-	go func() {
-		err := db.Walk(from, func(d *couchstore.Couchstore,
-			di *couchstore.DocInfo) error {
-			if to != "" && di.ID() >= to {
-				return couchstore.StopIteration
-			}
-
-			k := parseKey(di.ID())
-			g := (k / chunk) * chunk
-			totalKeys++
-
-			if g != prevg && len(infos) > 0 {
-				atomic.AddInt32(&started, 1)
-				processorInput <- processIn{args[0], prevg, infos, ptrs, reds,
-					before, ch}
-
-				infos = infos[:0]
-			}
-			infos = append(infos, di)
-			prevg = g
-
-			return nil
-		})
-
-		if err == nil && len(infos) > 0 {
-			atomic.AddInt32(&started, 1)
-			processorInput <- processIn{args[0], prevg, infos, ptrs, reds,
-				before, ch}
-		}
-
-		cherr <- err
-	}()
 
 	output := map[string]interface{}{}
 	going := true
+	finished := int32(0)
+	start := time.Now()
 
 	if err == nil {
-		for going || (started-finished) > 0 {
+		for going || (q.started-finished) > 0 {
 			select {
-			case po := <-ch:
-				atomic.AddInt32(&finished, 1)
+			case po := <-q.out:
+				finished++
 				if po.err != nil {
 					err = po.err
 				}
 				output[strconv.FormatInt(po.key/1e6, 10)] = po.value
-			case err = <-cherr:
+			case err = <-q.cherr:
 				going = false
 			}
 		}
 	}
 
 	log.Printf("Completed query processing in %v, %v keys, %v chunks",
-		time.Since(start), humanize.Comma(int64(totalKeys)),
-		humanize.Comma(int64(started)))
+		time.Since(start), humanize.Comma(int64(q.totalKeys)),
+		humanize.Comma(int64(q.started)))
 
 	if err != nil {
 		log.Printf("Error processing query: %v", err)

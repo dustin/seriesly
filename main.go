@@ -11,7 +11,8 @@ import (
 )
 
 var dbRoot = flag.String("root", "db", "Root directory for database files.")
-var queryWorkers = flag.Int("workers", 10, "Number of query workers.")
+var queryWorkers = flag.Int("queryWorkers", 10, "Number of query tree walkers.")
+var docWorkers = flag.Int("docWorkers", 10, "Number of document mapreduce workers.")
 var flushTime = flag.Duration("flushDelay", time.Second*5,
 	"Maximum amount of time to wait before flushing")
 var maxOpQueue = flag.Int("maxOpQueue", 1000,
@@ -154,9 +155,14 @@ func main() {
 		log.Fatalf("Programming error:  Could not find query handler")
 	}
 
-	processorInput = make(chan processIn, *queryWorkers)
-	for i := 0; i < *queryWorkers; i++ {
+	processorInput = make(chan processIn, *docWorkers)
+	for i := 0; i < *docWorkers; i++ {
 		go docProcessor(processorInput)
+	}
+
+	queryInput = make(chan *queryIn, *queryWorkers)
+	for i := 0; i < *queryWorkers; i++ {
+		go queryExecutor(queryInput)
 	}
 
 	s := &http.Server{

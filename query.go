@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/dustin/go-couchstore"
@@ -29,6 +30,20 @@ type processIn struct {
 	reds   []Reducer
 	before time.Time
 	out    chan<- processOut
+}
+
+type queryIn struct {
+	dbname    string
+	from      string
+	to        string
+	group     int
+	ptrs      []string
+	reds      []Reducer
+	before    time.Time
+	started   int32
+	totalKeys int32
+	out       chan processOut
+	cherr     chan error
 }
 
 func processDoc(collection [][]*string, doc string, ptrs []string) {
@@ -98,7 +113,84 @@ func docProcessor(ch <-chan processIn) {
 	}
 }
 
+func runQuery(q *queryIn) {
+	db, err := dbopen(q.dbname)
+	if err != nil {
+		log.Printf("Error opening db: %v - %v", q.dbname, err)
+		q.cherr <- err
+		return
+	}
+	defer db.Close()
+
+	chunk := int64(time.Duration(q.group) * time.Millisecond)
+
+	infos := []*couchstore.DocInfo{}
+	prevg := int64(0)
+
+	err = db.Walk(q.from, func(d *couchstore.Couchstore,
+		di *couchstore.DocInfo) error {
+		if q.to != "" && di.ID() >= q.to {
+			return couchstore.StopIteration
+		}
+
+		k := parseKey(di.ID())
+		g := (k / chunk) * chunk
+		atomic.AddInt32(&q.totalKeys, 1)
+
+		if g != prevg && len(infos) > 0 {
+			atomic.AddInt32(&q.started, 1)
+			processorInput <- processIn{q.dbname, prevg, infos,
+				q.ptrs, q.reds, q.before, q.out}
+
+			infos = infos[:0]
+		}
+		infos = append(infos, di)
+		prevg = g
+
+		return nil
+	})
+
+	if err == nil && len(infos) > 0 {
+		atomic.AddInt32(&q.started, 1)
+		processorInput <- processIn{q.dbname, prevg, infos,
+			q.ptrs, q.reds, q.before, q.out}
+	}
+
+	q.cherr <- err
+}
+
+func queryExecutor(ch <-chan *queryIn) {
+	for q := range ch {
+		if time.Now().Before(q.before) {
+			runQuery(q)
+		} else {
+			log.Printf("Timed out query that's %v late",
+				time.Since(q.before))
+			q.cherr <- timeoutError
+		}
+	}
+}
+
+func executeQuery(dbname, from, to string, group int,
+	ptrs []string, reds []Reducer) *queryIn {
+
+	rv := &queryIn{
+		dbname: dbname,
+		from:   from,
+		to:     to,
+		group:  group,
+		ptrs:   ptrs,
+		reds:   reds,
+		before: time.Now().Add(*queryTimeout),
+		out:    make(chan processOut, *queryWorkers),
+		cherr:  make(chan error),
+	}
+	queryInput <- rv
+	return rv
+}
+
 var processorInput chan processIn
+var queryInput chan *queryIn
 
 type Reducer func(input []*string) interface{}
 
