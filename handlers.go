@@ -147,18 +147,16 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	going := true
 	finished := int32(0)
 
-	if err == nil {
-		for going || (q.started-finished) > 0 {
-			select {
-			case po := <-q.out:
-				finished++
-				if po.err != nil {
-					err = po.err
-				}
-				output[strconv.FormatInt(po.key/1e6, 10)] = po.value
-			case err = <-q.cherr:
-				going = false
+	for going || (q.started-finished) > 0 {
+		select {
+		case po := <-q.out:
+			finished++
+			if po.err != nil {
+				err = po.err
 			}
+			output[strconv.FormatInt(po.key/1e6, 10)] = po.value
+		case err = <-q.cherr:
+			going = false
 		}
 	}
 
