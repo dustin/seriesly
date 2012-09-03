@@ -186,7 +186,7 @@ func executeQuery(dbname, from, to string, group int,
 		reds:   reds,
 		start:  now,
 		before: now.Add(*queryTimeout),
-		out:    make(chan processOut, *queryWorkers),
+		out:    make(chan processOut),
 		cherr:  make(chan error),
 	}
 	queryInput <- rv

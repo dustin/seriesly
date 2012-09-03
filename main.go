@@ -7,12 +7,11 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"runtime"
 	"time"
 )
 
 var dbRoot = flag.String("root", "db", "Root directory for database files.")
-var queryWorkers = flag.Int("queryWorkers", 10, "Number of query tree walkers.")
-var docWorkers = flag.Int("docWorkers", 10, "Number of document mapreduce workers.")
 var flushTime = flag.Duration("flushDelay", time.Second*5,
 	"Maximum amount of time to wait before flushing")
 var maxOpQueue = flag.Int("maxOpQueue", 1000,
@@ -20,8 +19,8 @@ var maxOpQueue = flag.Int("maxOpQueue", 1000,
 var staticPath = flag.String("static", "static", "Path to static data")
 var queryTimeout = flag.Duration("maxQueryTime", time.Minute*5,
 	"Maximum amount of time a query is allowed to process.")
-var queryBacklog = flag.Int("queryBacklog", 100, "Query scan/group backlog size")
-var docBacklog = flag.Int("docBacklog", 1000, "MR group request backlog size")
+var queryBacklog = flag.Int("queryBacklog", 0, "Query scan/group backlog size")
+var docBacklog = flag.Int("docBacklog", 0, "MR group request backlog size")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 
@@ -140,6 +139,15 @@ func handler(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
+	halfProcs := runtime.GOMAXPROCS(0) / 2
+	if halfProcs < 1 {
+		halfProcs = 1
+	}
+	queryWorkers := flag.Int("queryWorkers", halfProcs,
+		"Number of query tree walkers.")
+	docWorkers := flag.Int("docWorkers", halfProcs,
+		"Number of document mapreduce workers.")
+
 	addr := flag.String("addr", ":3133", "Address to bind to")
 	flag.Parse()
 
