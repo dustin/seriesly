@@ -143,7 +143,7 @@ func runQuery(q *queryIn) {
 			processorInput <- processIn{q.dbname, prevg, infos,
 				q.ptrs, q.reds, q.before, q.out}
 
-			infos = infos[:0]
+			infos = make([]*couchstore.DocInfo, 0, len(infos))
 		}
 		infos = append(infos, di)
 		prevg = g
