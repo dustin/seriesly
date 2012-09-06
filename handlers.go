@@ -254,9 +254,8 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 		output = w
 	}
 
-	fmt.Fprint(output, `{"results": [`)
-	defer fmt.Fprint(output, "]}")
-	e := json.NewEncoder(output)
+	output.Write([]byte{'{'})
+	defer output.Write([]byte{'}'})
 
 	seenOne := false
 
@@ -264,10 +263,14 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 		if !seenOne {
 			seenOne = true
 		} else {
-			output.Write([]byte{','})
+			output.Write([]byte(",\n"))
 		}
-		m := json.RawMessage(v)
-		return e.Encode(map[string]interface{}{k: &m})
+		_, err := fmt.Fprintf(output, `"%s": `, k)
+		if err != nil {
+			return err
+		}
+		_, err = output.Write(v)
+		return err
 	})
 }
 
