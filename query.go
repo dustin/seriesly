@@ -16,6 +16,8 @@ import (
 
 var timeoutError = errors.New("query timed out")
 
+type Reducer func(input []*string) interface{}
+
 type processOut struct {
 	key   int64
 	value interface{}
@@ -27,7 +29,7 @@ type processIn struct {
 	key    int64
 	infos  []*couchstore.DocInfo
 	ptrs   []string
-	reds   []Reducer
+	reds   []string
 	before time.Time
 	out    chan<- processOut
 }
@@ -38,7 +40,7 @@ type queryIn struct {
 	to        string
 	group     int
 	ptrs      []string
-	reds      []Reducer
+	reds      []string
 	start     time.Time
 	before    time.Time
 	started   int32
@@ -73,7 +75,7 @@ func processDoc(collection [][]*string, doc string, ptrs []string) {
 }
 
 func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
-	ptrs []string, reds []Reducer, ch chan<- processOut) {
+	ptrs []string, reds []string, ch chan<- processOut) {
 
 	result := processOut{key, nil, nil}
 
@@ -98,7 +100,12 @@ func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
 		}
 	}
 
-	result.value = reduce(collection, reds)
+	rfuns := make([]Reducer, len(reds))
+	for i, r := range reds {
+		rfuns[i] = reducers[r]
+	}
+
+	result.value = reduce(collection, rfuns)
 
 	ch <- result
 }
@@ -173,7 +180,7 @@ func queryExecutor(ch <-chan *queryIn) {
 }
 
 func executeQuery(dbname, from, to string, group int,
-	ptrs []string, reds []Reducer) *queryIn {
+	ptrs []string, reds []string) *queryIn {
 
 	now := time.Now()
 
@@ -195,8 +202,6 @@ func executeQuery(dbname, from, to string, group int,
 
 var processorInput chan processIn
 var queryInput chan *queryIn
-
-type Reducer func(input []*string) interface{}
 
 func reduce(collection [][]*string, reducers []Reducer) []interface{} {
 	rv := make([]interface{}, len(collection))

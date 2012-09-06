@@ -129,14 +129,14 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	}
 
 	ptrs := req.Form["ptr"]
-	reds := make([]Reducer, 0, len(ptrs))
+	reds := make([]string, 0, len(ptrs))
 	for _, r := range req.Form["reducer"] {
-		f, ok := reducers[r]
+		_, ok := reducers[r]
 		if !ok {
 			emitError(400, w, "No such reducer", r)
 			return
 		}
-		reds = append(reds, f)
+		reds = append(reds, r)
 	}
 	if len(ptrs) != len(reds) {
 		emitError(400, w, "Parameter mismatch",
