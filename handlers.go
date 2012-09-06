@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -99,6 +101,11 @@ func cleanupRangeParam(in, def string) (string, error) {
 	return t.UTC().Format(time.RFC3339Nano), nil
 }
 
+func canGzip(req *http.Request) bool {
+	acceptable := req.Header.Get("accept-encoding")
+	return strings.Contains(acceptable, "gzip")
+}
+
 func query(args []string, w http.ResponseWriter, req *http.Request) {
 	// Parse the params
 
@@ -168,7 +175,25 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		log.Printf("Error processing query: %v", err)
 		emitError(500, w, "Error traversing DB", err.Error())
 	} else {
-		e := json.NewEncoder(w)
+		z := canGzip(req)
+
+		w.Header().Set("Content-type", "text/html")
+		if z {
+			w.Header().Set("Content-Encoding", "gzip")
+		}
+		w.WriteHeader(200)
+
+		var e *json.Encoder
+
+		if z {
+			gz := gzip.NewWriter(w)
+			defer gz.Close()
+
+			e = json.NewEncoder(gz)
+		} else {
+			e = json.NewEncoder(w)
+		}
+
 		err := e.Encode(output)
 		if err != nil {
 			emitError(500, w, "Error encoding output", err.Error())
