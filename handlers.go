@@ -210,6 +210,15 @@ func deleteDB(parts []string, w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func compact(parts []string, w http.ResponseWriter, req *http.Request) {
+	err := dbcompact(parts[0])
+	if err == nil {
+		mustEncode(200, w, map[string]interface{}{"ok": true})
+	} else {
+		emitError(500, w, "Error compacting DB", err.Error())
+	}
+}
+
 // TODO:
 
 func dbInfo(parts []string, w http.ResponseWriter, req *http.Request) {

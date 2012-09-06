@@ -24,12 +24,14 @@ type dbqitem struct {
 	k      string
 	data   []byte
 	op     dbOperation
+	cherr  chan error
 }
 
 type dbWriter struct {
-	ch   chan dbqitem
-	quit chan bool
-	db   *couchstore.Couchstore
+	dbname string
+	ch     chan dbqitem
+	quit   chan bool
+	db     *couchstore.Couchstore
 }
 
 var dbLock = sync.Mutex{}
@@ -96,19 +98,53 @@ func dblist(root string) []string {
 	return rv
 }
 
-func dbWriteLoop(dq *dbWriter) {
-	defer dq.db.Close()
+func dbCompact(dq *dbWriter, bulk couchstore.BulkWriter, queued int,
+	qi dbqitem) (couchstore.BulkWriter, error) {
+	start := time.Now()
+	if queued > 0 {
+		bulk.Commit()
+		log.Printf("Flushed %d items in %v for pre-compact",
+			queued, time.Since(start))
+		bulk.Close()
+	}
+	dbn := dbPath(dq.dbname)
+	queued = 0
+	start = time.Now()
+	err := dq.db.CompactTo(dbn + ".compact")
+	if err != nil {
+		log.Printf("Error compacting: %v", err)
+		return dq.db.Bulk(), err
+	}
+	log.Printf("Finished compaction of %v in %v", dq.dbname,
+		time.Since(start))
+	err = os.Rename(dbn+".compact", dbn)
+	if err != nil {
+		log.Printf("Error putting compacted data back")
+		return dq.db.Bulk(), err
+	}
 
+	log.Printf("Reopening post-compact")
+	dq.db.Close()
+
+	dq.db, err = dbopen(dq.dbname)
+	if err != nil {
+		log.Fatalf("Error reopening DB after compaction: %v", err)
+	}
+	return dq.db.Bulk(), nil
+}
+
+func dbWriteLoop(dq *dbWriter) {
 	queued := 0
 	bulk := dq.db.Bulk()
-	defer bulk.Close()
-	defer bulk.Commit()
 
 	t := time.NewTimer(*flushTime)
 
 	for {
 		select {
 		case <-dq.quit:
+			bulk.Close()
+			bulk.Commit()
+			dq.db.Close()
 			return
 		case qi := <-dq.ch:
 			switch qi.op {
@@ -117,12 +153,18 @@ func dbWriteLoop(dq *dbWriter) {
 					couchstore.DocIsCompressed),
 					couchstore.NewDocument(qi.k,
 						string(qi.data)))
+				queued++
 			case db_delete_item:
+				queued++
 				bulk.Delete(couchstore.NewDocInfo(qi.k, 0))
+			case db_compact:
+				var err error
+				bulk, err = dbCompact(dq, bulk, queued, qi)
+				qi.cherr <- err
+				queued = 0
 			default:
 				log.Panicf("Unhandled case: %v", qi.op)
 			}
-			queued++
 			if queued >= *maxOpQueue {
 				start := time.Now()
 				bulk.Commit()
@@ -152,6 +194,7 @@ func dbWriteFun(dbname string) (*dbWriter, error) {
 	}
 
 	writer := &dbWriter{
+		dbname,
 		make(chan dbqitem, *maxOpQueue),
 		make(chan bool),
 		db,
@@ -184,9 +227,25 @@ func dbstore(dbname string, k string, body []byte) error {
 		return err
 	}
 
-	writer.ch <- dbqitem{dbname, k, body, db_store_item}
+	writer.ch <- dbqitem{dbname, k, body, db_store_item, nil}
 
 	return nil
+}
+
+func dbcompact(dbname string) error {
+	writer, err := getOrCreateDB(dbname)
+	if err != nil {
+		return err
+	}
+
+	cherr := make(chan error)
+	defer close(cherr)
+	writer.ch <- dbqitem{dbname: dbname,
+		op:    db_compact,
+		cherr: cherr,
+	}
+
+	return <-cherr
 }
 
 func parseKey(s string) int64 {
