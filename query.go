@@ -114,7 +114,13 @@ func process_docs(pi *processIn) {
 	result.value = reduce(collection, rfuns)
 
 	if result.cacheOpaque == 0 && result.cacheKey != "" {
-		cacheInputSet <- &result
+		// It's OK if we can't store our newly pulled item in
+		// the cache, but it's most definitely not OK to stop
+		// here because of this.
+		select {
+		case cacheInputSet <- &result:
+		default:
+		}
 	}
 	pi.out <- &result
 }
