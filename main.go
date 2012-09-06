@@ -21,6 +21,9 @@ var queryTimeout = flag.Duration("maxQueryTime", time.Minute*5,
 	"Maximum amount of time a query is allowed to process.")
 var queryBacklog = flag.Int("queryBacklog", 0, "Query scan/group backlog size")
 var docBacklog = flag.Int("docBacklog", 0, "MR group request backlog size")
+var cacheAddr = flag.String("memcache", "", "Memcached server to connect to")
+var cacheBacklog = flag.Int("cacheBacklog", 1000, "Cache backlog size")
+var cacheWorkers = flag.Int("cacheWorkers", 4, "Number of cache workers")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 
@@ -167,9 +170,20 @@ func main() {
 		log.Fatalf("Programming error:  Could not find query handler")
 	}
 
-	processorInput = make(chan processIn, *docBacklog)
+	processorInput = make(chan *processIn, *docBacklog)
 	for i := 0; i < *docWorkers; i++ {
 		go docProcessor(processorInput)
+	}
+
+	if *cacheAddr == "" {
+		cacheInput = processorInput
+		// Note: cacheInputSet will be null here, there should be no caching
+	} else {
+		cacheInput = make(chan *processIn, *cacheBacklog)
+		cacheInputSet = make(chan *processOut, *cacheBacklog)
+		for i := 0; i < *cacheWorkers; i++ {
+			go cacheProcessor(cacheInput, cacheInputSet)
+		}
 	}
 
 	queryInput = make(chan *queryIn, *queryBacklog)

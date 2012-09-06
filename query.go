@@ -19,19 +19,26 @@ var timeoutError = errors.New("query timed out")
 type Reducer func(input []*string) interface{}
 
 type processOut struct {
-	key   int64
-	value interface{}
-	err   error
+	cacheKey    string
+	key         int64
+	value       interface{}
+	err         error
+	cacheOpaque uint32
+}
+
+func (p processOut) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{"v": p.value})
 }
 
 type processIn struct {
-	dbname string
-	key    int64
-	infos  []*couchstore.DocInfo
-	ptrs   []string
-	reds   []string
-	before time.Time
-	out    chan<- processOut
+	cacheKey string
+	dbname   string
+	key      int64
+	infos    []*couchstore.DocInfo
+	ptrs     []string
+	reds     []string
+	before   time.Time
+	out      chan<- *processOut
 }
 
 type queryIn struct {
@@ -45,7 +52,7 @@ type queryIn struct {
 	before    time.Time
 	started   int32
 	totalKeys int32
-	out       chan processOut
+	out       chan *processOut
 	cherr     chan error
 }
 
@@ -74,25 +81,24 @@ func processDoc(collection [][]*string, doc string, ptrs []string) {
 	}
 }
 
-func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
-	ptrs []string, reds []string, ch chan<- processOut) {
+func process_docs(pi *processIn) {
 
-	result := processOut{key, nil, nil}
+	result := processOut{pi.cacheKey, pi.key, nil, nil, 0}
 
-	db, err := dbopen(dbname)
+	db, err := dbopen(pi.dbname)
 	if err != nil {
 		result.err = err
-		ch <- result
+		pi.out <- &result
 		return
 	}
 	defer db.Close()
 
-	collection := make([][]*string, len(ptrs))
+	collection := make([][]*string, len(pi.ptrs))
 
-	for _, di := range infos {
+	for _, di := range pi.infos {
 		doc, err := db.GetFromDocInfo(di)
 		if err == nil {
-			processDoc(collection, doc.Value(), ptrs)
+			processDoc(collection, doc.Value(), pi.ptrs)
 		} else {
 			for i := range collection {
 				collection[i] = append(collection[i], nil)
@@ -100,25 +106,37 @@ func process_docs(dbname string, key int64, infos []*couchstore.DocInfo,
 		}
 	}
 
-	rfuns := make([]Reducer, len(reds))
-	for i, r := range reds {
+	rfuns := make([]Reducer, len(pi.reds))
+	for i, r := range pi.reds {
 		rfuns[i] = reducers[r]
 	}
 
 	result.value = reduce(collection, rfuns)
 
-	ch <- result
+	if result.cacheOpaque == 0 && result.cacheKey != "" {
+		cacheInputSet <- &result
+	}
+	pi.out <- &result
 }
 
-func docProcessor(ch <-chan processIn) {
+func docProcessor(ch <-chan *processIn) {
 	for pi := range ch {
 		if time.Now().Before(pi.before) {
-			process_docs(pi.dbname, pi.key, pi.infos, pi.ptrs,
-				pi.reds, pi.out)
+			process_docs(pi)
 		} else {
-			pi.out <- processOut{pi.key, nil, timeoutError}
+			pi.out <- &processOut{"", pi.key, nil, timeoutError, 0}
 		}
 	}
+}
+
+func fetchDocs(dbname string, key int64, infos []*couchstore.DocInfo,
+	ptrs []string, reds []string, before time.Time,
+	out chan<- *processOut) {
+
+	i := processIn{"", dbname, key, infos,
+		ptrs, reds, before, out}
+
+	cacheInput <- &i
 }
 
 func runQuery(q *queryIn) {
@@ -147,8 +165,8 @@ func runQuery(q *queryIn) {
 
 		if g != prevg && len(infos) > 0 {
 			atomic.AddInt32(&q.started, 1)
-			processorInput <- processIn{q.dbname, prevg, infos,
-				q.ptrs, q.reds, q.before, q.out}
+			fetchDocs(q.dbname, prevg, infos,
+				q.ptrs, q.reds, q.before, q.out)
 
 			infos = make([]*couchstore.DocInfo, 0, len(infos))
 		}
@@ -160,8 +178,8 @@ func runQuery(q *queryIn) {
 
 	if err == nil && len(infos) > 0 {
 		atomic.AddInt32(&q.started, 1)
-		processorInput <- processIn{q.dbname, prevg, infos,
-			q.ptrs, q.reds, q.before, q.out}
+		fetchDocs(q.dbname, prevg, infos,
+			q.ptrs, q.reds, q.before, q.out)
 	}
 
 	q.cherr <- err
@@ -193,14 +211,14 @@ func executeQuery(dbname, from, to string, group int,
 		reds:   reds,
 		start:  now,
 		before: now.Add(*queryTimeout),
-		out:    make(chan processOut),
+		out:    make(chan *processOut),
 		cherr:  make(chan error),
 	}
 	queryInput <- rv
 	return rv
 }
 
-var processorInput chan processIn
+var processorInput chan *processIn
 var queryInput chan *queryIn
 
 func reduce(collection [][]*string, reducers []Reducer) []interface{} {
