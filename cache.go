@@ -128,7 +128,7 @@ func cacheProcessor(ch <-chan *processIn, chset <-chan *processOut) {
 				bytes, err := json.Marshal(po)
 				if err == nil {
 					req := &gomemcached.MCRequest{
-						Opcode: 1,
+						Opcode: gomemcached.SETQ,
 						Key:    []byte(po.cacheKey),
 						Cas:    0,
 						Opaque: 1,
