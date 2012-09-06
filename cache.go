@@ -78,7 +78,6 @@ func cacheProcessor(ch <-chan *processIn, chset <-chan *processOut) {
 				// No connection, pass through
 				processorInput <- pi
 			case time.Now().Before(pi.before):
-				// processorInput <- pi
 				newOpaque := opaque
 				opaque++
 				if opaque == math.MaxUint32 {
