@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -217,6 +218,57 @@ func compact(parts []string, w http.ResponseWriter, req *http.Request) {
 	} else {
 		emitError(500, w, "Error compacting DB", err.Error())
 	}
+}
+
+func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
+	// Parse the params
+
+	req.ParseForm()
+
+	from, err := cleanupRangeParam(req.FormValue("from"), "")
+	if err != nil {
+		emitError(400, w, "Bad from value: %v", err.Error())
+		return
+	}
+	to, err := cleanupRangeParam(req.FormValue("to"), "")
+	if err != nil {
+		emitError(400, w, "Bad to value: %v", err.Error())
+		return
+	}
+
+	z := canGzip(req)
+
+	w.Header().Set("Content-type", "text/html")
+	if z {
+		w.Header().Set("Content-Encoding", "gzip")
+	}
+	w.WriteHeader(200)
+
+	output := io.Writer(w)
+
+	if z {
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		output = gz
+	} else {
+		output = w
+	}
+
+	fmt.Fprint(output, `{"results": [`)
+	defer fmt.Fprint(output, "]}")
+	e := json.NewEncoder(output)
+
+	seenOne := false
+
+	err = dbwalk(args[0], from, to, func(k string, v []byte) error {
+		if !seenOne {
+			seenOne = true
+		} else {
+			output.Write([]byte{','})
+		}
+		m := json.RawMessage(v)
+		return e.Encode(map[string]interface{}{k: &m})
+	})
 }
 
 // TODO:

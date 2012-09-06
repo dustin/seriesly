@@ -248,6 +248,24 @@ func dbcompact(dbname string) error {
 	return <-cherr
 }
 
+func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
+	db, err := dbopen(dbname)
+	if err != nil {
+		log.Printf("Error opening db: %v - %v", dbname, err)
+		return err
+	}
+	defer db.Close()
+
+	return db.WalkDocs(from, func(d *couchstore.Couchstore,
+		di *couchstore.DocInfo, doc *couchstore.Document) error {
+		if to != "" && di.ID() >= to {
+			return couchstore.StopIteration
+		}
+
+		return f(di.ID(), []byte(doc.Value()))
+	})
+}
+
 func parseKey(s string) int64 {
 	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
