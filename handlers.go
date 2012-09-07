@@ -120,12 +120,12 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 	from, err := cleanupRangeParam(req.FormValue("from"), "")
 	if err != nil {
-		emitError(400, w, "Bad from value: %v", err.Error())
+		emitError(400, w, "Bad from value", err.Error())
 		return
 	}
 	to, err := cleanupRangeParam(req.FormValue("to"), "")
 	if err != nil {
-		emitError(400, w, "Bad to value: %v", err.Error())
+		emitError(400, w, "Bad to value", err.Error())
 		return
 	}
 
@@ -227,12 +227,12 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 
 	from, err := cleanupRangeParam(req.FormValue("from"), "")
 	if err != nil {
-		emitError(400, w, "Bad from value: %v", err.Error())
+		emitError(400, w, "Bad from value", err.Error())
 		return
 	}
 	to, err := cleanupRangeParam(req.FormValue("to"), "")
 	if err != nil {
-		emitError(400, w, "Bad to value: %v", err.Error())
+		emitError(400, w, "Bad to value", err.Error())
 		return
 	}
 
