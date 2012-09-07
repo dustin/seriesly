@@ -105,11 +105,7 @@ func process_docs(pi *processIn) {
 	}
 
 	go func() {
-		defer func() {
-			for i := range chans {
-				close(chans[i])
-			}
-		}()
+		defer closeAll(chans)
 
 		for _, di := range pi.infos {
 			doc, err := db.GetFromDocInfo(di)
