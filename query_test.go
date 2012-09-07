@@ -25,6 +25,17 @@ func init() {
 	}
 }
 
+func streamCollection(s []*string) chan *string {
+	ch := make(chan *string)
+	go func() {
+		defer close(ch)
+		for _, r := range s {
+			ch <- r
+		}
+	}()
+	return ch
+}
+
 func TestReducers(t *testing.T) {
 
 	tests := []struct {
@@ -42,7 +53,7 @@ func TestReducers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := reducers[test.reducer](testInput)
+		got := reducers[test.reducer](streamCollection(testInput))
 		if !reflect.DeepEqual(got, test.exp) {
 			t.Errorf("Expected %v for %v, got %v",
 				test.exp, test.reducer, got)
