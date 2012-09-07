@@ -274,6 +274,15 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 	})
 }
 
+func getDocument(parts []string, w http.ResponseWriter, req *http.Request) {
+	d, err := dbGetDoc(parts[0], parts[1])
+	if err == nil {
+		w.Write(d)
+	} else {
+		emitError(404, w, "Error retrieving value", err.Error())
+	}
+}
+
 // TODO:
 
 func dbInfo(parts []string, w http.ResponseWriter, req *http.Request) {
@@ -281,10 +290,6 @@ func dbInfo(parts []string, w http.ResponseWriter, req *http.Request) {
 }
 
 func dbChanges(parts []string, w http.ResponseWriter, req *http.Request) {
-	notImplemented(parts, w, req)
-}
-
-func getDocument(parts []string, w http.ResponseWriter, req *http.Request) {
 	notImplemented(parts, w, req)
 }
 

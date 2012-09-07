@@ -247,6 +247,21 @@ func dbcompact(dbname string) error {
 	return <-cherr
 }
 
+func dbGetDoc(dbname, id string) ([]byte, error) {
+	db, err := dbopen(dbname)
+	if err != nil {
+		log.Printf("Error opening db: %v - %v", dbname, err)
+		return []byte{}, err
+	}
+	defer db.Close()
+
+	doc, _, err := db.Get(id)
+	if err != nil {
+		return []byte{}, err
+	}
+	return doc.Value(), err
+}
+
 func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
 	db, err := dbopen(dbname)
 	if err != nil {
