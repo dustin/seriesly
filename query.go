@@ -21,7 +21,7 @@ type Reducer func(input chan *string) interface{}
 type processOut struct {
 	cacheKey    string
 	key         int64
-	value       interface{}
+	value       []interface{}
 	err         error
 	cacheOpaque uint32
 }

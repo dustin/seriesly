@@ -26,7 +26,7 @@ func cacheReceiveLoop(client *memcached.Client, out chan *processOut) {
 		po := processOut{cacheOpaque: res.Opaque}
 
 		if res.Opcode == gomemcached.GET && res.Status == gomemcached.SUCCESS {
-			rv := map[string]interface{}{}
+			rv := map[string][]interface{}{}
 			err = json.Unmarshal(res.Body, &rv)
 			if err == nil {
 				po.value = rv["v"]
