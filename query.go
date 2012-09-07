@@ -56,10 +56,10 @@ type queryIn struct {
 	cherr     chan error
 }
 
-func processDoc(chs []chan *string, doc string, ptrs []string) {
+func processDoc(chs []chan *string, doc []byte, ptrs []string) {
 
 	j := map[string]interface{}{}
-	err := json.Unmarshal([]byte(doc), &j)
+	err := json.Unmarshal(doc, &j)
 	if err != nil {
 		for i := range ptrs {
 			chs[i] <- nil

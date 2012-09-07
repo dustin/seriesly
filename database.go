@@ -151,8 +151,7 @@ func dbWriteLoop(dq *dbWriter) {
 			case db_store_item:
 				bulk.Set(couchstore.NewDocInfo(qi.k,
 					couchstore.DocIsCompressed),
-					couchstore.NewDocument(qi.k,
-						string(qi.data)))
+					couchstore.NewDocument(qi.k, qi.data))
 				queued++
 			case db_delete_item:
 				queued++
@@ -262,7 +261,7 @@ func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
 			return couchstore.StopIteration
 		}
 
-		return f(di.ID(), []byte(doc.Value()))
+		return f(di.ID(), doc.Value())
 	})
 }
 
