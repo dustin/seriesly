@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"hash/fnv"
 	"log"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/dustin/gomemcached"
@@ -157,11 +157,12 @@ func cacheProcessor(ch <-chan *processIn, chset <-chan *processOut) {
 func cacheKey(p *processIn) string {
 	h := fnv.New64()
 	for _, i := range p.infos {
-		h.Write([]byte(i.ID()))
+		i.WriteIDTo(h)
 	}
 	for i := range p.ptrs {
 		h.Write([]byte(p.ptrs[i]))
 		h.Write([]byte(p.reds[i]))
 	}
-	return fmt.Sprintf("%v#%v#%v", p.dbname, p.key, h.Sum64())
+	return p.dbname + "#" + strconv.FormatInt(p.key, 10) +
+		"#" + strconv.FormatUint(h.Sum64(), 10)
 }
