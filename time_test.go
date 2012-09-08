@@ -59,3 +59,79 @@ func TestTimeParsing(t *testing.T) {
 		}
 	}
 }
+
+func TestCanonicalParser(t *testing.T) {
+	tests := []struct {
+		input string
+		exp   string
+	}{
+		{"2012-08-28T21:24:35.374651883Z", ""},
+		{"2012-08-28T21:24:35.37465188Z", ""},
+		{"2012-08-28T21:24:35.3746518Z", ""},
+		{"2012-08-28T21:24:35.374651Z", ""},
+		{"2012-08-28T21:24:35.37465Z", ""},
+		{"2012-08-28T21:24:35.3746Z", ""},
+		{"2012-08-28T21:24:35.374Z", ""},
+		{"2012-08-28T21:24:35.37Z", ""},
+		{"2012-08-28T21:24:35.3Z", ""},
+		{"2012-08-28T21:24:35.0Z", "2012-08-28T21:24:35Z"},
+		{"2012-08-28T21:24:35.Z", "2012-08-28T21:24:35Z"},
+		{"2012-08-28T21:24:35Z", ""},
+	}
+
+	for _, x := range tests {
+		tm, err := parseCanonicalTime(x.input)
+		if err != nil {
+			t.Errorf("Error on %v - %v", x.input, err)
+			t.Fail()
+		}
+		got := tm.UTC().Format(time.RFC3339Nano)
+		exp := x.exp
+		if exp == "" {
+			exp = x.input
+		}
+		if exp != got {
+			t.Errorf("Expected %v for %v, got %v", x.exp, x.input, got)
+			t.Fail()
+		}
+	}
+}
+
+func benchTimeParsing(b *testing.B, input string) {
+	for i := 0; i < b.N; i++ {
+		_, err := parseTime(input)
+		if err != nil {
+			b.Fatalf("Error on %v - %v", input, err)
+		}
+	}
+}
+
+func BenchmarkParseTimeCanonicalDirect(b *testing.B) {
+	input := "2012-08-28T21:24:35.37465188Z"
+	for i := 0; i < b.N; i++ {
+		_, err := parseCanonicalTime(input)
+		if err != nil {
+			b.Fatalf("Error on %v - %v", input, err)
+		}
+	}
+}
+
+func BenchmarkParseTimeCanonical(b *testing.B) {
+	benchTimeParsing(b, "2012-08-28T21:24:35.37465188Z")
+}
+
+func BenchmarkParseTimeMisc(b *testing.B) {
+	benchTimeParsing(b, "Tue, 28 Aug 2012 21:24:35 +0000")
+}
+
+func BenchmarkParseTimeIntNano(b *testing.B) {
+	benchTimeParsing(b, "1346189075374651880")
+}
+
+func BenchmarkParseTimeIntMillis(b *testing.B) {
+	benchTimeParsing(b, "1346189075374")
+}
+
+func BenchmarkParseTimeIntSecs(b *testing.B) {
+	benchTimeParsing(b, "1346189075")
+}
