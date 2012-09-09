@@ -169,34 +169,41 @@ func runQuery(q *queryIn) {
 	chunk := int64(time.Duration(q.group) * time.Millisecond)
 
 	infos := []*couchstore.DocInfo{}
-	prevg := int64(0)
+	g := int64(0)
+	nextg := ""
 
 	err = db.Walk(q.from, func(d *couchstore.Couchstore,
 		di *couchstore.DocInfo) error {
-		if q.to != "" && di.ID() >= q.to {
+		kstr := di.ID()
+		if q.to != "" && kstr >= q.to {
 			return couchstore.StopIteration
 		}
 
-		k := parseKey(di.ID())
-		g := (k / chunk) * chunk
 		atomic.AddInt32(&q.totalKeys, 1)
 
-		if g != prevg && len(infos) > 0 {
-			atomic.AddInt32(&q.started, 1)
-			fetchDocs(q.dbname, prevg, infos,
-				q.ptrs, q.reds, q.before, q.out)
+		if kstr >= nextg {
+			if len(infos) > 0 {
+				atomic.AddInt32(&q.started, 1)
+				fetchDocs(q.dbname, g, infos,
+					q.ptrs, q.reds, q.before, q.out)
 
-			infos = make([]*couchstore.DocInfo, 0, len(infos))
+				infos = make([]*couchstore.DocInfo, 0, len(infos))
+			}
+
+			k := parseKey(kstr)
+			g = (k / chunk) * chunk
+			nextgi := g + chunk
+			nextgt := time.Unix(nextgi/1e9, nextgi%1e9).UTC()
+			nextg = nextgt.Format(time.RFC3339Nano)
 		}
 		infos = append(infos, di)
-		prevg = g
 
 		return nil
 	})
 
 	if err == nil && len(infos) > 0 {
 		atomic.AddInt32(&q.started, 1)
-		fetchDocs(q.dbname, prevg, infos,
+		fetchDocs(q.dbname, g, infos,
 			q.ptrs, q.reds, q.before, q.out)
 	}
 
