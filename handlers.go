@@ -149,51 +149,53 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	defer close(q.out)
 	defer close(q.cherr)
 
-	// Open the DB and do the work.
+	output := io.Writer(w)
 
-	output := map[string]interface{}{}
+	if canGzip(req) {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		output = gz
+	} else {
+		output = w
+	}
+	w.WriteHeader(200)
+
+	output.Write([]byte{'{'})
+
 	going := true
 	finished := int32(0)
-
 	for going || (q.started-finished) > 0 {
 		select {
 		case po := <-q.out:
-			finished++
-			if po.err != nil {
-				err = po.err
+			if finished != 0 {
+				output.Write([]byte{',', '\n'})
 			}
-			output[strconv.FormatInt(po.key/1e6, 10)] = po.value
+			finished++
+
+			_, err := fmt.Fprintf(output, `"%d": `, po.key/1e6)
+			if err == nil {
+				var d []byte
+				d, err = json.Marshal(po.value)
+				if err == nil {
+					_, err = output.Write(d)
+				}
+			}
+			if err != nil {
+				log.Printf("Error sending item: %v", err)
+				output = ioutil.Discard
+				q.before = time.Time{}
+			}
 		case err = <-q.cherr:
 			going = false
 		}
 	}
 
+	output.Write([]byte{'}'})
+
 	log.Printf("Completed query processing in %v, %v keys, %v chunks",
 		time.Since(q.start), humanize.Comma(int64(q.totalKeys)),
 		humanize.Comma(int64(q.started)))
-
-	if err != nil {
-		log.Printf("Error processing query: %v", err)
-		emitError(500, w, "Error traversing DB", err.Error())
-	} else {
-		var e *json.Encoder
-
-		if canGzip(req) {
-			w.Header().Set("Content-Encoding", "gzip")
-			gz := gzip.NewWriter(w)
-			defer gz.Close()
-
-			e = json.NewEncoder(gz)
-		} else {
-			e = json.NewEncoder(w)
-		}
-		w.WriteHeader(200)
-
-		err := e.Encode(output)
-		if err != nil {
-			emitError(500, w, "Error encoding output", err.Error())
-		}
-	}
 }
 
 func deleteDB(parts []string, w http.ResponseWriter, req *http.Request) {
