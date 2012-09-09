@@ -281,7 +281,7 @@ func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
 }
 
 func parseKey(s string) int64 {
-	t, err := time.Parse(time.RFC3339Nano, s)
+	t, err := parseCanonicalTime(s)
 	if err != nil {
 		return -1
 	}
