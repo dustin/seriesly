@@ -176,17 +176,10 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		log.Printf("Error processing query: %v", err)
 		emitError(500, w, "Error traversing DB", err.Error())
 	} else {
-		z := canGzip(req)
-
-		w.Header().Set("Content-type", "text/html")
-		if z {
-			w.Header().Set("Content-Encoding", "gzip")
-		}
-		w.WriteHeader(200)
-
 		var e *json.Encoder
 
-		if z {
+		if canGzip(req) {
+			w.Header().Set("Content-Encoding", "gzip")
 			gz := gzip.NewWriter(w)
 			defer gz.Close()
 
@@ -194,6 +187,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		} else {
 			e = json.NewEncoder(w)
 		}
+		w.WriteHeader(200)
 
 		err := e.Encode(output)
 		if err != nil {
