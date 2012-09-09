@@ -236,22 +236,17 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	z := canGzip(req)
-
-	if z {
-		w.Header().Set("Content-Encoding", "gzip")
-	}
-	w.WriteHeader(200)
-
 	output := io.Writer(w)
 
-	if z {
+	if canGzip(req) {
+		w.Header().Set("Content-Encoding", "gzip")
 		gz := gzip.NewWriter(w)
 		defer gz.Close()
 		output = gz
 	} else {
 		output = w
 	}
+	w.WriteHeader(200)
 
 	output.Write([]byte{'{'})
 	defer output.Write([]byte{'}'})
@@ -259,10 +254,10 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 	seenOne := false
 
 	err = dbwalk(args[0], from, to, func(k string, v []byte) error {
-		if !seenOne {
-			seenOne = true
-		} else {
+		if seenOne {
 			output.Write([]byte(",\n"))
+		} else {
+			seenOne = true
 		}
 		_, err := fmt.Fprintf(output, `"%s": `, k)
 		if err != nil {
