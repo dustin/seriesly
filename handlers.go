@@ -238,7 +238,6 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 
 	z := canGzip(req)
 
-	w.Header().Set("Content-type", "text/html")
 	if z {
 		w.Header().Set("Content-Encoding", "gzip")
 	}
