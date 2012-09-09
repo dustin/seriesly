@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"runtime"
+	"runtime/pprof"
 	"time"
 )
 
@@ -24,6 +26,13 @@ var docBacklog = flag.Int("docBacklog", 0, "MR group request backlog size")
 var cacheAddr = flag.String("memcache", "", "Memcached server to connect to")
 var cacheBacklog = flag.Int("cacheBacklog", 1000, "Cache backlog size")
 var cacheWorkers = flag.Int("cacheWorkers", 4, "Number of cache workers")
+
+// Profiling
+var pprofFile = flag.String("proFile", "", "File to write profiling info into")
+var pprofStart = flag.Duration("proStart", 5*time.Second,
+	"How long after startup to start profiling")
+var pprofDuration = flag.Duration("proDuration", 5*time.Minute,
+	"How long to run the profiler before shutting it down")
 
 type routeHandler func(parts []string, w http.ResponseWriter, req *http.Request)
 
@@ -145,6 +154,26 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func startProfiler() {
+	time.Sleep(*pprofStart)
+	log.Printf("Starting profiler")
+	f, err := os.OpenFile(*pprofFile, os.O_WRONLY|os.O_CREATE, 0666)
+	if err == nil {
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			log.Fatalf("Can't start profiler")
+		}
+		time.AfterFunc(*pprofDuration, func() {
+			log.Printf("Shutting down profiler")
+			pprof.StopCPUProfile()
+			f.Close()
+		})
+	} else {
+		log.Printf("Can't open profilefile")
+	}
+
+}
+
 func main() {
 	halfProcs := runtime.GOMAXPROCS(0) / 2
 	if halfProcs < 1 {
@@ -191,6 +220,10 @@ func main() {
 	queryInput = make(chan *queryIn, *queryBacklog)
 	for i := 0; i < *queryWorkers; i++ {
 		go queryExecutor(queryInput)
+	}
+
+	if *pprofFile != "" {
+		go startProfiler()
 	}
 
 	s := &http.Server{
