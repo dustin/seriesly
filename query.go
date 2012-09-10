@@ -17,8 +17,9 @@ import (
 var timeoutError = errors.New("query timed out")
 
 type ptrval struct {
-	di  *couchstore.DocInfo
-	val *string
+	di       *couchstore.DocInfo
+	val      *string
+	included bool
 }
 
 type Reducer func(input chan ptrval) interface{}
@@ -40,6 +41,7 @@ type processIn struct {
 	dbname   string
 	key      int64
 	infos    []*couchstore.DocInfo
+	nextInfo *couchstore.DocInfo
 	ptrs     []string
 	reds     []string
 	before   time.Time
@@ -62,9 +64,9 @@ type queryIn struct {
 }
 
 func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
-	doc []byte, ptrs []string) {
+	doc []byte, ptrs []string, included bool) {
 
-	pv := ptrval{di, nil}
+	pv := ptrval{di, nil, included}
 
 	j := map[string]interface{}{}
 	err := json.Unmarshal(doc, &j)
@@ -117,15 +119,22 @@ func process_docs(pi *processIn) {
 	go func() {
 		defer closeAll(chans)
 
-		for _, di := range pi.infos {
+		dodoc := func(di *couchstore.DocInfo, included bool) {
 			doc, err := db.GetFromDocInfo(di)
 			if err == nil {
-				processDoc(di, chans, doc.Value(), pi.ptrs)
+				processDoc(di, chans, doc.Value(), pi.ptrs, included)
 			} else {
 				for i := range pi.ptrs {
-					chans[i] <- ptrval{di, nil}
+					chans[i] <- ptrval{di, nil, included}
 				}
 			}
+		}
+
+		for _, di := range pi.infos {
+			dodoc(di, true)
+		}
+		if pi.nextInfo != nil {
+			dodoc(pi.nextInfo, false)
 		}
 	}()
 
@@ -158,10 +167,10 @@ func docProcessor(ch <-chan *processIn) {
 }
 
 func fetchDocs(dbname string, key int64, infos []*couchstore.DocInfo,
-	ptrs []string, reds []string, before time.Time,
-	out chan<- *processOut) {
+	nextInfo *couchstore.DocInfo, ptrs []string, reds []string,
+	before time.Time, out chan<- *processOut) {
 
-	i := processIn{"", dbname, key, infos,
+	i := processIn{"", dbname, key, infos, nextInfo,
 		ptrs, reds, before, out}
 
 	cacheInput <- &i
@@ -185,8 +194,9 @@ func runQuery(q *queryIn) {
 	err = db.Walk(q.from, func(d *couchstore.Couchstore,
 		di *couchstore.DocInfo) error {
 		kstr := di.ID()
+		var err error
 		if q.to != "" && kstr >= q.to {
-			return couchstore.StopIteration
+			err = couchstore.StopIteration
 		}
 
 		atomic.AddInt32(&q.totalKeys, 1)
@@ -194,7 +204,7 @@ func runQuery(q *queryIn) {
 		if kstr >= nextg {
 			if len(infos) > 0 {
 				atomic.AddInt32(&q.started, 1)
-				fetchDocs(q.dbname, g, infos,
+				fetchDocs(q.dbname, g, infos, di,
 					q.ptrs, q.reds, q.before, q.out)
 
 				infos = make([]*couchstore.DocInfo, 0, len(infos))
@@ -208,12 +218,12 @@ func runQuery(q *queryIn) {
 		}
 		infos = append(infos, di)
 
-		return nil
+		return err
 	})
 
 	if err == nil && len(infos) > 0 {
 		atomic.AddInt32(&q.started, 1)
-		fetchDocs(q.dbname, g, infos,
+		fetchDocs(q.dbname, g, infos, nil,
 			q.ptrs, q.reds, q.before, q.out)
 	}
 
@@ -261,10 +271,52 @@ func convertTofloat64(in chan ptrval) chan float64 {
 	go func() {
 		defer close(ch)
 		for v := range in {
-			if v.val != nil {
+			if v.included && v.val != nil {
 				x, err := strconv.ParseFloat(*v.val, 64)
 				if err == nil {
 					ch <- x
+				}
+			}
+		}
+	}()
+
+	return ch
+}
+
+func convertTofloat64Rate(in chan ptrval) chan float64 {
+	ch := make(chan float64)
+	go func() {
+		defer close(ch)
+		var prevts int64
+		var preval float64
+
+		// First, find a part of the stream that has usable data.
+		for v := range in {
+			if v.di != nil && v.val != nil {
+				x, err := strconv.ParseFloat(*v.val, 64)
+				if err == nil {
+					prevts = parseKey(v.di.ID())
+					preval = x
+					break
+				}
+			}
+		}
+		// Then emit floats based on deltas from previous values.
+		for v := range in {
+			if v.di != nil && v.val != nil {
+				x, err := strconv.ParseFloat(*v.val, 64)
+				if err == nil {
+					thists := parseKey(v.di.ID())
+
+					val := ((x - preval) /
+						(float64(thists-prevts) / 1e9))
+
+					if !math.IsNaN(val) {
+						ch <- val
+					}
+
+					prevts = thists
+					preval = x
 				}
 			}
 		}
@@ -277,13 +329,15 @@ var reducers = map[string]Reducer{
 	"identity": func(input chan ptrval) interface{} {
 		rv := []*string{}
 		for s := range input {
-			rv = append(rv, s.val)
+			if s.included {
+				rv = append(rv, s.val)
+			}
 		}
 		return rv
 	},
 	"any": func(input chan ptrval) interface{} {
 		for v := range input {
-			if v.val != nil {
+			if v.included && v.val != nil {
 				return *v.val
 			}
 		}
@@ -292,7 +346,7 @@ var reducers = map[string]Reducer{
 	"count": func(input chan ptrval) interface{} {
 		rv := 0
 		for v := range input {
-			if v.val != nil {
+			if v.included && v.val != nil {
 				rv++
 			}
 		}
@@ -338,5 +392,32 @@ var reducers = map[string]Reducer{
 			sum += v
 		}
 		return sum / nums
+	},
+	"c_min": func(input chan ptrval) interface{} {
+		rv := float64(math.MaxInt64)
+		for v := range convertTofloat64Rate(input) {
+			if v < rv {
+				rv = v
+			}
+		}
+		return rv
+	},
+	"c_avg": func(input chan ptrval) interface{} {
+		nums := float64(0)
+		sum := float64(0)
+		for v := range convertTofloat64Rate(input) {
+			nums++
+			sum += v
+		}
+		return sum / nums
+	},
+	"c_max": func(input chan ptrval) interface{} {
+		rv := float64(math.MinInt64)
+		for v := range convertTofloat64Rate(input) {
+			if v > rv {
+				rv = v
+			}
+		}
+		return rv
 	},
 }
