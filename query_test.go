@@ -24,12 +24,12 @@ func init() {
 	}
 }
 
-func streamCollection(s []*string) chan *string {
-	ch := make(chan *string)
+func streamCollection(s []*string) chan ptrval {
+	ch := make(chan ptrval)
 	go func() {
 		defer close(ch)
 		for _, r := range s {
-			ch <- r
+			ch <- ptrval{nil, r}
 		}
 	}()
 	return ch

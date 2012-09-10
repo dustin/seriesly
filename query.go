@@ -16,7 +16,12 @@ import (
 
 var timeoutError = errors.New("query timed out")
 
-type Reducer func(input chan *string) interface{}
+type ptrval struct {
+	di  *couchstore.DocInfo
+	val *string
+}
+
+type Reducer func(input chan ptrval) interface{}
 
 type processOut struct {
 	cacheKey    string
@@ -56,13 +61,16 @@ type queryIn struct {
 	cherr     chan error
 }
 
-func processDoc(chs []chan *string, doc []byte, ptrs []string) {
+func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
+	doc []byte, ptrs []string) {
+
+	pv := ptrval{di, nil}
 
 	j := map[string]interface{}{}
 	err := json.Unmarshal(doc, &j)
 	if err != nil {
 		for i := range ptrs {
-			chs[i] <- nil
+			chs[i] <- pv
 		}
 		return
 	}
@@ -70,13 +78,15 @@ func processDoc(chs []chan *string, doc []byte, ptrs []string) {
 		val := jsonpointer.Get(j, p)
 		switch x := val.(type) {
 		case string:
-			chs[i] <- &x
+			pv.val = &x
+			chs[i] <- pv
 		case int, uint, int64, float64, uint64, bool:
 			v := fmt.Sprintf("%v", val)
-			chs[i] <- &v
+			pv.val = &v
+			chs[i] <- pv
 		default:
 			log.Printf("Ignoring %T", val)
-			chs[i] <- nil
+			chs[i] <- pv
 		}
 	}
 }
@@ -93,10 +103,10 @@ func process_docs(pi *processIn) {
 	}
 	defer db.Close()
 
-	chans := make([]chan *string, 0, len(pi.ptrs))
+	chans := make([]chan ptrval, 0, len(pi.ptrs))
 	resultchs := make([]chan interface{}, 0, len(pi.ptrs))
 	for i, r := range pi.reds {
-		chans = append(chans, make(chan *string))
+		chans = append(chans, make(chan ptrval))
 		resultchs = append(resultchs, make(chan interface{}))
 
 		go func() {
@@ -110,10 +120,10 @@ func process_docs(pi *processIn) {
 		for _, di := range pi.infos {
 			doc, err := db.GetFromDocInfo(di)
 			if err == nil {
-				processDoc(chans, doc.Value(), pi.ptrs)
+				processDoc(di, chans, doc.Value(), pi.ptrs)
 			} else {
 				for i := range pi.ptrs {
-					chans[i] <- nil
+					chans[i] <- ptrval{di, nil}
 				}
 			}
 		}
@@ -246,13 +256,13 @@ func executeQuery(dbname, from, to string, group int,
 var processorInput chan *processIn
 var queryInput chan *queryIn
 
-func convertTofloat64(in chan *string) chan float64 {
+func convertTofloat64(in chan ptrval) chan float64 {
 	ch := make(chan float64)
 	go func() {
 		defer close(ch)
 		for v := range in {
-			if v != nil {
-				x, err := strconv.ParseFloat(*v, 64)
+			if v.val != nil {
+				x, err := strconv.ParseFloat(*v.val, 64)
 				if err == nil {
 					ch <- x
 				}
@@ -264,45 +274,45 @@ func convertTofloat64(in chan *string) chan float64 {
 }
 
 var reducers = map[string]Reducer{
-	"identity": func(input chan *string) interface{} {
+	"identity": func(input chan ptrval) interface{} {
 		rv := []*string{}
 		for s := range input {
-			rv = append(rv, s)
+			rv = append(rv, s.val)
 		}
 		return rv
 	},
-	"any": func(input chan *string) interface{} {
+	"any": func(input chan ptrval) interface{} {
 		for v := range input {
-			if v != nil {
-				return *v
+			if v.val != nil {
+				return *v.val
 			}
 		}
 		return nil
 	},
-	"count": func(input chan *string) interface{} {
+	"count": func(input chan ptrval) interface{} {
 		rv := 0
 		for v := range input {
-			if v != nil {
+			if v.val != nil {
 				rv++
 			}
 		}
 		return rv
 	},
-	"sum": func(input chan *string) interface{} {
+	"sum": func(input chan ptrval) interface{} {
 		rv := float64(0)
 		for v := range convertTofloat64(input) {
 			rv += v
 		}
 		return rv
 	},
-	"sumsq": func(input chan *string) interface{} {
+	"sumsq": func(input chan ptrval) interface{} {
 		rv := float64(0)
 		for v := range convertTofloat64(input) {
 			rv += (v * v)
 		}
 		return rv
 	},
-	"max": func(input chan *string) interface{} {
+	"max": func(input chan ptrval) interface{} {
 		rv := float64(math.MinInt64)
 		for v := range convertTofloat64(input) {
 			if v > rv {
@@ -311,7 +321,7 @@ var reducers = map[string]Reducer{
 		}
 		return rv
 	},
-	"min": func(input chan *string) interface{} {
+	"min": func(input chan ptrval) interface{} {
 		rv := float64(math.MaxInt64)
 		for v := range convertTofloat64(input) {
 			if v < rv {
@@ -320,7 +330,7 @@ var reducers = map[string]Reducer{
 		}
 		return rv
 	},
-	"avg": func(input chan *string) interface{} {
+	"avg": func(input chan ptrval) interface{} {
 		nums := float64(0)
 		sum := float64(0)
 		for v := range convertTofloat64(input) {
