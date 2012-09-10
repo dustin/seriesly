@@ -29,6 +29,15 @@ the defaults should work quite well.
 Then just start blasting data into it.  See the [protocol docs][wiki]
 for details on this.
 
+# More Info
+
+My [blog post][blog] provides an overview of the why and a little bit
+of the what.  There's also a [youtube video][youtube] of me demoing
+the software a few days after the initial version hit github.  It's
+matured a lot since then, but the core concepts haven't changed.
+
+[blog]: http://dustin.github.com/2012/09/09/seriesly.html
+[youtube]: http://youtu.be/8b-8NTCyFQQ
 [wiki]: //github.com/dustin/seriesly/wiki
 [couchstore]: /couchbase/couchstore
 [go]: http://golang.org/
