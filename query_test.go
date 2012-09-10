@@ -7,13 +7,12 @@ import (
 	"testing"
 )
 
-var testInput = []*string{}
+var testInput = []*string{nil}
 
 var bigInput []byte
 
 func init() {
-	testInput = append(testInput, nil)
-	s := []string{"31", "63", "foo"}
+	s := []string{"31", "63", "foo", "17"}
 	for i := range s {
 		testInput = append(testInput, &s[i])
 	}
@@ -43,12 +42,12 @@ func TestReducers(t *testing.T) {
 		exp     interface{}
 	}{
 		{"any", "31"},
-		{"count", 3},
-		{"sum", float64(94)},
-		{"sumsq", float64(4930)},
+		{"count", 4},
+		{"sum", float64(111)},
+		{"sumsq", float64(5219)},
 		{"max", float64(63)},
-		{"min", float64(31)},
-		{"avg", 94.0 / 2.0},
+		{"min", float64(17)},
+		{"avg", float64(37)},
 		{"identity", testInput},
 	}
 
