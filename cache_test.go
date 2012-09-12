@@ -7,8 +7,7 @@ import (
 	"github.com/dustin/go-couchstore"
 )
 
-func BenchmarkCacheKeying(b *testing.B) {
-
+func benchCacheSize(b *testing.B, num int) {
 	p := processIn{
 		dbname: "mydatabase",
 		key:    817492945,
@@ -17,7 +16,7 @@ func BenchmarkCacheKeying(b *testing.B) {
 	}
 
 	startTime := time.Now()
-	for i := 0; i < 1440; i++ {
+	for i := 0; i < num; i++ {
 		di := couchstore.NewDocInfo(startTime.Format(time.RFC3339Nano),
 			0)
 		p.infos = append(p.infos, di)
@@ -27,4 +26,12 @@ func BenchmarkCacheKeying(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		cacheKey(&p)
 	}
+}
+
+func BenchmarkCacheKeying1440(b *testing.B) {
+	benchCacheSize(b, 1440)
+}
+
+func BenchmarkCacheKeying10(b *testing.B) {
+	benchCacheSize(b, 10)
 }
