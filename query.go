@@ -394,7 +394,10 @@ var reducers = map[string]Reducer{
 			nums++
 			sum += v
 		}
-		return sum / nums
+		if nums > 0 {
+			return sum / nums
+		}
+		return math.NaN()
 	},
 	"c_min": func(input chan ptrval) interface{} {
 		rv := math.NaN()
@@ -412,7 +415,10 @@ var reducers = map[string]Reducer{
 			nums++
 			sum += v
 		}
-		return sum / nums
+		if nums > 0 {
+			return sum / nums
+		}
+		return math.NaN()
 	},
 	"c_max": func(input chan ptrval) interface{} {
 		rv := math.NaN()
