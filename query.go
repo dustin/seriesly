@@ -80,26 +80,22 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 		}
 		return
 	}
-	filterPass := true
 	for i, p := range filters {
 		val := jsonpointer.Get(j, p)
 		checkVal := filtervals[i]
 		switch val.(type) {
 		case string:
 			if (val != checkVal) {
-				filterPass = false
+				return
 			}
 		case int, uint, int64, float64, uint64, bool:
 			v := fmt.Sprintf("%v", val)
 			if (v != checkVal) {
-				filterPass = false
+				return
 			}
 		default:
-			filterPass = false
+			return
 		}
-	}
-	if filterPass == false {
-		return
 	}
 		
 	for i, p := range ptrs {
