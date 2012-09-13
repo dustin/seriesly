@@ -163,6 +163,10 @@ func cacheKey(p *processIn) string {
 		h.Write([]byte(p.ptrs[i]))
 		h.Write([]byte(p.reds[i]))
 	}
+	for i := range p.filters {
+		h.Write([]byte(p.filters[i]))
+		h.Write([]byte(p.filtervals[i]))
+	}
 	return p.dbname + "#" + strconv.FormatInt(p.key, 10) +
 		"#" + strconv.FormatUint(h.Sum64(), 10)
 }
