@@ -37,38 +37,40 @@ func (p processOut) MarshalJSON() ([]byte, error) {
 }
 
 type processIn struct {
-	cacheKey string
-	dbname   string
-	key      int64
-	infos    []*couchstore.DocInfo
-	nextInfo *couchstore.DocInfo
-	ptrs     []string
-	reds     []string
-	before   time.Time
-	filters	 []string
+	cacheKey   string
+	dbname     string
+	key        int64
+	infos      []*couchstore.DocInfo
+	nextInfo   *couchstore.DocInfo
+	ptrs       []string
+	reds       []string
+	before     time.Time
+	filters    []string
 	filtervals []string
-	out      chan<- *processOut
+	out        chan<- *processOut
 }
 
 type queryIn struct {
-	dbname    string
-	from      string
-	to        string
-	group     int
-	ptrs      []string
-	reds      []string
-	start     time.Time
-	before    time.Time
-	filters	  []string
+	dbname     string
+	from       string
+	to         string
+	group      int
+	ptrs       []string
+	reds       []string
+	start      time.Time
+	before     time.Time
+	filters    []string
 	filtervals []string
-	started   int32
-	totalKeys int32
-	out       chan *processOut
-	cherr     chan error
+	started    int32
+	totalKeys  int32
+	out        chan *processOut
+	cherr      chan error
 }
 
 func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
-	doc []byte, ptrs []string, filters []string, filtervals []string, included bool) {
+	doc []byte, ptrs []string,
+	filters []string, filtervals []string,
+	included bool) {
 
 	pv := ptrval{di, nil, included}
 
@@ -85,12 +87,12 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 		checkVal := filtervals[i]
 		switch val.(type) {
 		case string:
-			if (val != checkVal) {
+			if val != checkVal {
 				return
 			}
 		case int, uint, int64, float64, uint64, bool:
 			v := fmt.Sprintf("%v", val)
-			if (v != checkVal) {
+			if v != checkVal {
 				return
 			}
 		default:
@@ -144,7 +146,8 @@ func process_docs(pi *processIn) {
 		dodoc := func(di *couchstore.DocInfo, included bool) {
 			doc, err := db.GetFromDocInfo(di)
 			if err == nil {
-				processDoc(di, chans, doc.Value(), pi.ptrs, pi.filters, pi.filtervals, included)
+				processDoc(di, chans, doc.Value(), pi.ptrs,
+					pi.filters, pi.filtervals, included)
 			} else {
 				for i := range pi.ptrs {
 					chans[i] <- ptrval{di, nil, included}
@@ -193,7 +196,8 @@ func docProcessor(ch <-chan *processIn) {
 
 func fetchDocs(dbname string, key int64, infos []*couchstore.DocInfo,
 	nextInfo *couchstore.DocInfo, ptrs []string, reds []string,
-	before time.Time, filters []string, filtervals []string, out chan<- *processOut) {
+	filters []string, filtervals []string,
+	before time.Time, out chan<- *processOut) {
 
 	i := processIn{"", dbname, key, infos, nextInfo,
 		ptrs, reds, before, filters, filtervals, out}
@@ -224,15 +228,14 @@ func runQuery(q *queryIn) {
 			err = couchstore.StopIteration
 		}
 
-
-
 		atomic.AddInt32(&q.totalKeys, 1)
 
 		if kstr >= nextg {
 			if len(infos) > 0 {
 				atomic.AddInt32(&q.started, 1)
 				fetchDocs(q.dbname, g, infos, di,
-					q.ptrs, q.reds, q.before, q.filters, q.filtervals, q.out)
+					q.ptrs, q.reds, q.filters, q.filtervals,
+					q.before, q.out)
 
 				infos = make([]*couchstore.DocInfo, 0, len(infos))
 			}
@@ -251,7 +254,8 @@ func runQuery(q *queryIn) {
 	if err == nil && len(infos) > 0 {
 		atomic.AddInt32(&q.started, 1)
 		fetchDocs(q.dbname, g, infos, nil,
-			q.ptrs, q.reds, q.before, q.filters, q.filtervals, q.out)
+			q.ptrs, q.reds, q.filters, q.filtervals,
+			q.before, q.out)
 	}
 
 	q.cherr <- err
@@ -275,18 +279,18 @@ func executeQuery(dbname, from, to string, group int,
 	now := time.Now()
 
 	rv := &queryIn{
-		dbname:  dbname,
-		from:    from,
-		to:      to,
-		group:   group,
-		ptrs:    ptrs,
-		reds:    reds,
-		start:   now,
-		before:  now.Add(*queryTimeout),
-	    filters: filters,
+		dbname:     dbname,
+		from:       from,
+		to:         to,
+		group:      group,
+		ptrs:       ptrs,
+		reds:       reds,
+		start:      now,
+		before:     now.Add(*queryTimeout),
+		filters:    filters,
 		filtervals: filtervals,
-		out:     make(chan *processOut),
-		cherr:   make(chan error),
+		out:        make(chan *processOut),
+		cherr:      make(chan error),
 	}
 	queryInput <- rv
 	return rv
