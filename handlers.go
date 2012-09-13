@@ -145,7 +145,15 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	q := executeQuery(args[0], from, to, group, ptrs, reds)
+	filters := req.Form["f"]
+	filtervals := req.Form["fv"]
+	if len(filters) != len(filtervals) {
+		emitError(400, w, "Parameter mismatch",
+			"Must supply the same number of filters and filter values")
+		return
+	}
+
+	q := executeQuery(args[0], from, to, group, ptrs, reds, filters, filtervals)
 	defer close(q.out)
 	defer close(q.cherr)
 
