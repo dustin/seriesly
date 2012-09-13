@@ -391,7 +391,10 @@ var reducers = map[string]Reducer{
 			nums++
 			sum += v
 		}
-		return sum / nums
+		if nums > 0 {
+			return sum / nums
+		}
+		return nil
 	},
 	"c_min": func(input chan ptrval) interface{} {
 		rv := float64(math.MaxInt64)
