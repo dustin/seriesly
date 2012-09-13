@@ -86,13 +86,11 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 		checkVal := filtervals[i]
 		switch val.(type) {
 		case string:
-			log.Printf("Checking for filter %s to be %s", val, checkVal)
 			if (val != checkVal) {
 				filterPass = false
 			}
 		case int, uint, int64, float64, uint64, bool:
 			v := fmt.Sprintf("%v", val)
-			log.Printf("Checking for filter %s to be %s", v, checkVal)
 			if (v != checkVal) {
 				filterPass = false
 			}
