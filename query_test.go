@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -112,6 +113,82 @@ func TestReducers(t *testing.T) {
 	for _, test := range tests {
 		got := reducers[test.reducer](streamCollection(testInput))
 		if !reflect.DeepEqual(got, test.exp) {
+			t.Errorf("Expected %v for %v, got %v",
+				test.exp, test.reducer, got)
+			t.Fail()
+		}
+	}
+}
+
+func TestEmptyReducers(t *testing.T) {
+	emptyInput := []*string{}
+	tests := []struct {
+		reducer string
+		exp     interface{}
+	}{
+		{"any", nil},
+		{"count", 0},
+		{"sum", 0.0},
+		{"sumsq", 0.0},
+		{"max", math.NaN()},
+		{"min", math.NaN()},
+		{"avg", math.NaN()},
+		{"c_min", math.NaN()},
+		{"c_avg", math.NaN()},
+		{"c_max", math.NaN()},
+		{"identity", emptyInput},
+	}
+
+	eq := func(a, b interface{}) bool {
+		if !reflect.DeepEqual(a, b) {
+			af, aok := a.(float64)
+			bf, bok := b.(float64)
+			return aok && bok && (math.IsNaN(af) == math.IsNaN(bf))
+		}
+		return true
+	}
+
+	for _, test := range tests {
+		got := reducers[test.reducer](streamCollection(emptyInput))
+		if !eq(got, test.exp) {
+			t.Errorf("Expected %v for %v, got %v",
+				test.exp, test.reducer, got)
+			t.Fail()
+		}
+	}
+}
+
+func TestNilReducers(t *testing.T) {
+	emptyInput := []*string{nil}
+	tests := []struct {
+		reducer string
+		exp     interface{}
+	}{
+		{"any", nil},
+		{"count", 0},
+		{"sum", 0.0},
+		{"sumsq", 0.0},
+		{"max", math.NaN()},
+		{"min", math.NaN()},
+		{"avg", math.NaN()},
+		{"c_min", math.NaN()},
+		{"c_avg", math.NaN()},
+		{"c_max", math.NaN()},
+		{"identity", emptyInput},
+	}
+
+	eq := func(a, b interface{}) bool {
+		if !reflect.DeepEqual(a, b) {
+			af, aok := a.(float64)
+			bf, bok := b.(float64)
+			return aok && bok && (math.IsNaN(af) == math.IsNaN(bf))
+		}
+		return true
+	}
+
+	for _, test := range tests {
+		got := reducers[test.reducer](streamCollection(emptyInput))
+		if !eq(got, test.exp) {
 			t.Errorf("Expected %v for %v, got %v",
 				test.exp, test.reducer, got)
 			t.Fail()

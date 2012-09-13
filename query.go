@@ -141,6 +141,9 @@ func process_docs(pi *processIn) {
 	results := make([]interface{}, len(pi.ptrs))
 	for i := 0; i < len(pi.ptrs); i++ {
 		results[i] = <-resultchs[i]
+		if f, fok := results[i].(float64); fok && math.IsNaN(f) {
+			results[i] = nil
+		}
 	}
 	result.value = results
 
@@ -367,18 +370,18 @@ var reducers = map[string]Reducer{
 		return rv
 	},
 	"max": func(input chan ptrval) interface{} {
-		rv := float64(math.MinInt64)
+		rv := math.NaN()
 		for v := range convertTofloat64(input) {
-			if v > rv {
+			if v > rv || math.IsNaN(rv) {
 				rv = v
 			}
 		}
 		return rv
 	},
 	"min": func(input chan ptrval) interface{} {
-		rv := float64(math.MaxInt64)
+		rv := math.NaN()
 		for v := range convertTofloat64(input) {
-			if v < rv {
+			if v < rv || math.IsNaN(rv) {
 				rv = v
 			}
 		}
@@ -394,9 +397,9 @@ var reducers = map[string]Reducer{
 		return sum / nums
 	},
 	"c_min": func(input chan ptrval) interface{} {
-		rv := float64(math.MaxInt64)
+		rv := math.NaN()
 		for v := range convertTofloat64Rate(input) {
-			if v < rv {
+			if v < rv || math.IsNaN(rv) {
 				rv = v
 			}
 		}
@@ -412,9 +415,9 @@ var reducers = map[string]Reducer{
 		return sum / nums
 	},
 	"c_max": func(input chan ptrval) interface{} {
-		rv := float64(math.MinInt64)
+		rv := math.NaN()
 		for v := range convertTofloat64Rate(input) {
-			if v > rv {
+			if v > rv || math.IsNaN(rv) {
 				rv = v
 			}
 		}
