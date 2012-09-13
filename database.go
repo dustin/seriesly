@@ -61,6 +61,11 @@ func dbopen(name string) (*couchstore.Couchstore, error) {
 	return db, err
 }
 
+func dbopenOrCreate(name string) (*couchstore.Couchstore, error) {
+	db, err := couchstore.Open(dbPath(name), true)
+	return db, err
+}
+
 func dbcreate(path string) error {
 	db, err := couchstore.Open(path, true)
 	if err != nil {
@@ -187,7 +192,7 @@ func dbWriteLoop(dq *dbWriter) {
 }
 
 func dbWriteFun(dbname string) (*dbWriter, error) {
-	db, err := dbopen(dbname)
+	db, err := dbopenOrCreate(dbname)
 	if err != nil {
 		return nil, err
 	}
