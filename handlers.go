@@ -288,11 +288,29 @@ func getDocument(parts []string, w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// TODO:
+func dbInfo(args []string, w http.ResponseWriter, req *http.Request) {
+	db, err := dbopen(args[0])
+	if err != nil {
+		emitError(500, w, "Error opening DB", err.Error())
+		return
+	}
+	defer db.Close()
 
-func dbInfo(parts []string, w http.ResponseWriter, req *http.Request) {
-	notImplemented(parts, w, req)
+	inf, err := db.Info()
+	if err == nil {
+		mustEncode(200, w, map[string]interface{}{
+			"last_seq":      inf.LastSeq,
+			"doc_count":     inf.DocCount,
+			"deleted_count": inf.DeletedCount,
+			"space_used":    inf.SpaceUsed,
+			"header_pos":    inf.HeaderPosition,
+		})
+	} else {
+		emitError(500, w, "Error getting db info", err.Error())
+	}
 }
+
+// TODO:
 
 func dbChanges(parts []string, w http.ResponseWriter, req *http.Request) {
 	notImplemented(parts, w, req)
