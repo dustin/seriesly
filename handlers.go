@@ -139,6 +139,13 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		}
 		reds = append(reds, r)
 	}
+
+	if len(ptrs) < 1 {
+		emitError(400, w, "Pointer required",
+			"At least one ptr argument is required")
+		return
+	}
+
 	if len(ptrs) != len(reds) {
 		emitError(400, w, "Parameter mismatch",
 			"Must supply the same number of pointers and reducers")

@@ -121,6 +121,10 @@ func process_docs(pi *processIn) {
 
 	result := processOut{pi.cacheKey, pi.key, nil, nil, 0}
 
+	if len(pi.ptrs) == 0 {
+		log.Panicf("No pointers specified in query: %#v", *pi)
+	}
+
 	db, err := dbopen(pi.dbname)
 	if err != nil {
 		result.err = err
@@ -206,6 +210,11 @@ func fetchDocs(dbname string, key int64, infos []*couchstore.DocInfo,
 }
 
 func runQuery(q *queryIn) {
+	if len(q.ptrs) == 0 {
+		q.cherr <- fmt.Errorf("At least one pointer is required")
+		return
+	}
+
 	db, err := dbopen(q.dbname)
 	if err != nil {
 		log.Printf("Error opening db: %v - %v", q.dbname, err)
