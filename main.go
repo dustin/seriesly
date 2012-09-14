@@ -185,6 +185,7 @@ func main() {
 		"Number of document mapreduce workers.")
 
 	addr := flag.String("addr", ":3133", "Address to bind to")
+	mcaddr := flag.String("memcbind", "", "Memcached server bind address")
 	flag.Parse()
 
 	// Update the query handler deadline to the query timeout
@@ -224,6 +225,10 @@ func main() {
 
 	if *pprofFile != "" {
 		go startProfiler()
+	}
+
+	if *mcaddr != "" {
+		go listenMC(*mcaddr)
 	}
 
 	s := &http.Server{
