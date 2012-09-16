@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-humanize"
 )
 
@@ -206,6 +207,58 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		humanize.Comma(int64(q.started)))
 }
 
+func deleteBulk(args []string, w http.ResponseWriter, req *http.Request) {
+	// Parse the params
+
+	req.ParseForm()
+
+	compactAfter := strings.ToLower(req.FormValue("compact"))
+
+	from, err := cleanupRangeParam(req.FormValue("from"), "")
+	if err != nil {
+		emitError(400, w, "Bad from value", err.Error())
+		return
+	}
+	to, err := cleanupRangeParam(req.FormValue("to"), "")
+	if err != nil {
+		emitError(400, w, "Bad to value", err.Error())
+		return
+	}
+
+	db, err := dbopen(args[0])
+	if err != nil {
+		emitError(400, w, "Unable to open Database", err.Error())
+		return
+	}
+
+	bulk := db.Bulk()
+	deleteCount := 0
+	commitThreshold := 10000
+
+	err = dbwalkKeys(args[0], from, to, func(k string) error {
+
+		bulk.Delete(couchstore.NewDocInfo(k, 0))
+		deleteCount++
+		if deleteCount >= commitThreshold {
+			bulk.Commit()
+			deleteCount = 0
+		}
+		return err
+	})
+
+	if deleteCount > 0 {
+		bulk.Commit()
+	}
+
+	bulk.Close()
+
+	if compactAfter == "true" {
+		err = dbcompact(args[0])
+	}
+
+	w.WriteHeader(201)
+
+}
 func deleteDB(parts []string, w http.ResponseWriter, req *http.Request) {
 	err := dbdelete(parts[0])
 	if err == nil {

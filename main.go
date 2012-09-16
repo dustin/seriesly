@@ -65,6 +65,8 @@ var routingTable []routingEntry = []routingEntry{
 		dbChanges, defaultDeadline},
 	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_query$"),
 		query, *queryTimeout},
+	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/_bulk$"),
+		deleteBulk, *queryTimeout},
 	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_all"),
 		allDocs, *queryTimeout},
 	routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/_compact"),
