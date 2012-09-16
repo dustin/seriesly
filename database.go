@@ -280,6 +280,24 @@ func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
 	})
 }
 
+func dbwalkKeys(dbname, from, to string, f func(k string) error) error {
+	db, err := dbopen(dbname)
+	if err != nil {
+		log.Printf("Error opening db: %v - %v", dbname, err)
+		return err
+	}
+	defer db.Close()
+
+	return db.Walk(from, func(d *couchstore.Couchstore,
+		di *couchstore.DocInfo) error {
+		if to != "" && di.ID() >= to {
+			return couchstore.StopIteration
+		}
+
+		return f(di.ID())
+	})
+}
+
 func parseKey(s string) int64 {
 	t, err := parseCanonicalTime(s)
 	if err != nil {
