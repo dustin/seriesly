@@ -139,9 +139,9 @@ func process_docs(pi *processIn) {
 		chans = append(chans, make(chan ptrval))
 		resultchs = append(resultchs, make(chan interface{}))
 
-		go func() {
-			resultchs[i] <- reducers[r](chans[i])
-		}()
+		go func(fi int, fr string) {
+			resultchs[fi] <- reducers[fr](chans[fi])
+		}(i, r)
 	}
 
 	go func() {
