@@ -190,6 +190,10 @@ func main() {
 	mcaddr := flag.String("memcbind", "", "Memcached server bind address")
 	flag.Parse()
 
+	if err := os.MkdirAll(*dbRoot, 0777); err != nil {
+		log.Fatalf("Could not create %v: %v", *dbRoot, err)
+	}
+
 	// Update the query handler deadline to the query timeout
 	found := false
 	for i := range routingTable {
