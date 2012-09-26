@@ -14,7 +14,7 @@ var exampleTime time.Time
 
 func init() {
 	var err error
-	exampleTime, err = time.Parse(time.RFC3339Nano, exampleTimeString)
+	exampleTime, err = time.Parse(time.RFC3339, exampleTimeString)
 	if err != nil {
 		panic(err)
 	}
