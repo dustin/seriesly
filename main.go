@@ -176,6 +176,18 @@ func startProfiler() {
 
 }
 
+func createRootIfMissing() {
+	_, err := os.Stat(*dbRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			var perm os.FileMode = 0777
+			if err := os.Mkdir(*dbRoot, perm); err != nil {
+				log.Fatal("Failed to create %s", *dbRoot)
+			}
+		}
+	}
+}
+
 func main() {
 	halfProcs := runtime.GOMAXPROCS(0) / 2
 	if halfProcs < 1 {
@@ -189,7 +201,7 @@ func main() {
 	addr := flag.String("addr", ":3133", "Address to bind to")
 	mcaddr := flag.String("memcbind", "", "Memcached server bind address")
 	flag.Parse()
-
+	createRootIfMissing()
 	// Update the query handler deadline to the query timeout
 	found := false
 	for i := range routingTable {
