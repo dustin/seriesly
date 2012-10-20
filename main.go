@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/syslog"
 	"net/http"
 	"os"
 	"regexp"
@@ -26,6 +27,7 @@ var docBacklog = flag.Int("docBacklog", 0, "MR group request backlog size")
 var cacheAddr = flag.String("memcache", "", "Memcached server to connect to")
 var cacheBacklog = flag.Int("cacheBacklog", 1000, "Cache backlog size")
 var cacheWorkers = flag.Int("cacheWorkers", 4, "Number of cache workers")
+var useSyslog = flag.Bool("syslog", false, "Log to syslog")
 
 // Profiling
 var pprofFile = flag.String("proFile", "", "File to write profiling info into")
@@ -189,6 +191,15 @@ func main() {
 	addr := flag.String("addr", ":3133", "Address to bind to")
 	mcaddr := flag.String("memcbind", "", "Memcached server bind address")
 	flag.Parse()
+
+	if *useSyslog {
+		sl, err := syslog.New(syslog.LOG_INFO, "seriesly")
+		if err != nil {
+			log.Fatalf("Can't initialize syslog: %v", err)
+		}
+		log.SetOutput(sl)
+		log.SetFlags(0)
+	}
 
 	if err := os.MkdirAll(*dbRoot, 0777); err != nil {
 		log.Fatalf("Could not create %v: %v", *dbRoot, err)
