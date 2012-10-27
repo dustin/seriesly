@@ -67,6 +67,18 @@ type queryIn struct {
 	cherr      chan error
 }
 
+func pget(j []byte, s string) (rv interface{}) {
+	b, err := jsonpointer.Find(j, s)
+	if err != nil {
+		return nil
+	}
+	err = json.Unmarshal(b, &rv)
+	if err != nil {
+		return nil
+	}
+	return
+}
+
 func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 	doc []byte, ptrs []string,
 	filters []string, filtervals []string,
@@ -74,16 +86,8 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 
 	pv := ptrval{di, nil, included}
 
-	j := map[string]interface{}{}
-	err := json.Unmarshal(doc, &j)
-	if err != nil {
-		for i := range ptrs {
-			chs[i] <- pv
-		}
-		return
-	}
 	for i, p := range filters {
-		val := jsonpointer.Get(j, p)
+		val := pget(doc, p)
 		checkVal := filtervals[i]
 		switch val.(type) {
 		case string:
@@ -101,7 +105,7 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 	}
 
 	for i, p := range ptrs {
-		val := jsonpointer.Get(j, p)
+		val := pget(doc, p)
 		switch x := val.(type) {
 		case string:
 			pv.val = &x
