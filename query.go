@@ -67,16 +67,20 @@ type queryIn struct {
 	cherr      chan error
 }
 
-func pget(j []byte, s string) (rv interface{}) {
-	b, err := jsonpointer.Find(j, s)
+func resolveFetch(j []byte, keys []string) map[string]interface{} {
+	rv := map[string]interface{}{}
+	found, err := jsonpointer.FindMany(j, keys)
 	if err != nil {
-		return nil
+		return rv
 	}
-	err = json.Unmarshal(b, &rv)
-	if err != nil {
-		return nil
+	for k, v := range found {
+		var val interface{}
+		err = json.Unmarshal(v, &val)
+		if err == nil {
+			rv[k] = val
+		}
 	}
-	return
+	return rv
 }
 
 func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
@@ -86,8 +90,27 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 
 	pv := ptrval{di, nil, included}
 
+	// Find all keys for filters and comparisons so we can do a
+	// single pass through the document.
+	keys := make([]string, 0, len(filters)+len(ptrs))
+	seen := map[string]bool{}
+	for _, f := range filters {
+		if !seen[f] {
+			keys = append(keys, f)
+			seen[f] = true
+		}
+	}
+	for _, f := range ptrs {
+		if !seen[f] {
+			keys = append(keys, f)
+			seen[f] = true
+		}
+	}
+
+	fetched := resolveFetch(doc, keys)
+
 	for i, p := range filters {
-		val := pget(doc, p)
+		val := fetched[p]
 		checkVal := filtervals[i]
 		switch val.(type) {
 		case string:
@@ -105,7 +128,7 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 	}
 
 	for i, p := range ptrs {
-		val := pget(doc, p)
+		val := fetched[p]
 		switch x := val.(type) {
 		case string:
 			pv.val = &x
