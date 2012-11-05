@@ -169,8 +169,10 @@ func dbWriteLoop(dq *dbWriter) {
 			if queued >= *maxOpQueue {
 				start := time.Now()
 				bulk.Commit()
-				log.Printf("Flush of %d items took %v",
-					queued, time.Since(start))
+				if *verbose {
+					log.Printf("Flush of %d items took %v",
+						queued, time.Since(start))
+				}
 				queued = 0
 				t.Stop()
 				t = time.NewTimer(*flushTime)
@@ -179,8 +181,10 @@ func dbWriteLoop(dq *dbWriter) {
 			if queued > 0 {
 				start := time.Now()
 				bulk.Commit()
-				log.Printf("Flush of %d items from timer took %v",
-					queued, time.Since(start))
+				if *verbose {
+					log.Printf("Flush of %d items from timer took %v",
+						queued, time.Since(start))
+				}
 				queued = 0
 			}
 			t = time.NewTimer(*flushTime)
