@@ -103,8 +103,10 @@ func dbCompact(dq *dbWriter, bulk couchstore.BulkWriter, queued int,
 	start := time.Now()
 	if queued > 0 {
 		bulk.Commit()
-		log.Printf("Flushed %d items in %v for pre-compact",
-			queued, time.Since(start))
+		if *verbose {
+			log.Printf("Flushed %d items in %v for pre-compact",
+				queued, time.Since(start))
+		}
 		bulk.Close()
 	}
 	dbn := dbPath(dq.dbname)

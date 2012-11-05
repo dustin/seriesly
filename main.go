@@ -27,6 +27,7 @@ var docBacklog = flag.Int("docBacklog", 0, "MR group request backlog size")
 var cacheAddr = flag.String("memcache", "", "Memcached server to connect to")
 var cacheBacklog = flag.Int("cacheBacklog", 1000, "Cache backlog size")
 var cacheWorkers = flag.Int("cacheWorkers", 4, "Number of cache workers")
+var verbose = flag.Bool("v", false, "Verbose logging")
 var useSyslog = flag.Bool("syslog", false, "Log to syslog")
 
 // Profiling
