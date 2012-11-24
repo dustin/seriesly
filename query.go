@@ -405,12 +405,13 @@ var reducers = map[string]Reducer{
 		return rv
 	},
 	"any": func(input chan ptrval) interface{} {
+		var rv interface{}
 		for v := range input {
-			if v.included && v.val != nil {
-				return *v.val
+			if rv == nil && v.included && v.val != nil {
+				rv = *v.val
 			}
 		}
-		return nil
+		return rv
 	},
 	"count": func(input chan ptrval) interface{} {
 		rv := 0
