@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net"
 	"time"
@@ -21,7 +22,7 @@ type MCSession struct {
 }
 
 func (sess *MCSession) HandleMessage(
-	req *gomemcached.MCRequest) *gomemcached.MCResponse {
+	w io.Writer, req *gomemcached.MCRequest) *gomemcached.MCResponse {
 
 	switch req.Opcode {
 	case SELECT_BUCKET:
