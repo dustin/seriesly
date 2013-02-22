@@ -38,6 +38,6 @@ matured a lot since then, but the core concepts haven't changed.
 
 [blog]: http://dustin.github.com/2012/09/09/seriesly.html
 [youtube]: http://youtu.be/8b-8NTCyFQQ
-[wiki]: //github.com/dustin/seriesly/wiki
-[couchstore]: /couchbase/couchstore
+[wiki]: https://github.com/dustin/seriesly/wiki
+[couchstore]: https://github.com/couchbase/couchstore
 [go]: http://golang.org/
