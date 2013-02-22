@@ -196,6 +196,30 @@ func TestNilReducers(t *testing.T) {
 	}
 }
 
+func TestPointers(t *testing.T) {
+	docId := "2013-02-22T16:29:19.750264Z"
+	di := couchstore.NewDocInfo(docId, 0)
+	tests := []struct {
+		pointer string
+		exp     interface{}
+	}{
+		{"/kind", "Listing"},
+		{"_id", docId},
+	}
+
+	for _, test := range tests {
+		chans := make([]chan ptrval, 0, 1)
+		chans = append(chans, make(chan ptrval))
+		go processDoc(di, chans, bigInput, []string{test.pointer}, []string{}, []string{}, true)
+		got := <-chans[0]
+		if test.exp != *got.val {
+			t.Errorf("Expected %v for %v, got %v",
+				test.exp, test.pointer, *got.val)
+		}
+	}
+
+}
+
 func BenchmarkJSONParser(b *testing.B) {
 	b.SetBytes(int64(len(bigInput)))
 	for i := 0; i < b.N; i++ {

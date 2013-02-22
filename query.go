@@ -129,6 +129,9 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 
 	for i, p := range ptrs {
 		val := fetched[p]
+		if p == "_id" {
+			val = di.ID()
+		}
 		switch x := val.(type) {
 		case string:
 			pv.val = &x
