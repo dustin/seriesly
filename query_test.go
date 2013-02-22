@@ -10,15 +10,15 @@ import (
 	"github.com/dustin/go-couchstore"
 )
 
-var testInput = []*string{nil}
+var testInput = []interface{}{}
 var nextValue = "29"
 
 var bigInput []byte
 
 func init() {
-	s := []string{"31", "63", "foo", "17"}
+	s := []interface{}{"31", "63", "foo", "17"}
 	for i := range s {
-		testInput = append(testInput, &s[i])
+		testInput = append(testInput, s[i])
 	}
 
 	var err error
@@ -28,7 +28,7 @@ func init() {
 	}
 }
 
-func streamCollection(s []*string) chan ptrval {
+func streamCollection(s []interface{}) chan ptrval {
 	ch := make(chan ptrval)
 	go func() {
 		defer close(ch)
@@ -40,7 +40,7 @@ func streamCollection(s []*string) chan ptrval {
 		}
 		t = t.Add(time.Second)
 		ts := t.Format(time.RFC3339Nano)
-		ch <- ptrval{couchstore.NewDocInfo(ts, 0), &nextValue, false}
+		ch <- ptrval{couchstore.NewDocInfo(ts, 0), nextValue, false}
 	}()
 	return ch
 }
@@ -73,12 +73,12 @@ func TestPairRateConversion(t *testing.T) {
 	tm := time.Now().UTC()
 	val1 := "20"
 	ch <- ptrval{couchstore.NewDocInfo(tm.Format(time.RFC3339Nano), 0),
-		&val1, true}
+		val1, true}
 
 	tm = tm.Add(5 * time.Second)
 	val2 := "25"
 	ch <- ptrval{couchstore.NewDocInfo(tm.Format(time.RFC3339Nano), 0),
-		&val2, false}
+		val2, false}
 
 	close(ch)
 	exp := 1.0
@@ -120,7 +120,7 @@ func TestReducers(t *testing.T) {
 }
 
 func TestEmptyReducers(t *testing.T) {
-	emptyInput := []*string{}
+	emptyInput := []interface{}{}
 	tests := []struct {
 		reducer string
 		exp     interface{}
@@ -158,7 +158,7 @@ func TestEmptyReducers(t *testing.T) {
 }
 
 func TestNilReducers(t *testing.T) {
-	emptyInput := []*string{nil}
+	emptyInput := []interface{}{}
 	tests := []struct {
 		reducer string
 		exp     interface{}
