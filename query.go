@@ -241,6 +241,10 @@ func runQuery(q *queryIn) {
 		q.cherr <- fmt.Errorf("At least one pointer is required")
 		return
 	}
+	if q.group == 0 {
+		q.cherr <- fmt.Errorf("group level cannot be zero.")
+		return
+	}
 
 	db, err := dbopen(q.dbname)
 	if err != nil {
