@@ -28,6 +28,7 @@ var cacheAddr = flag.String("memcache", "", "Memcached server to connect to")
 var cacheBacklog = flag.Int("cacheBacklog", 1000, "Cache backlog size")
 var cacheWorkers = flag.Int("cacheWorkers", 4, "Number of cache workers")
 var verbose = flag.Bool("v", false, "Verbose logging")
+var logAccess = flag.Bool("logAccess", false, "Log HTTP Requests")
 var useSyslog = flag.Bool("syslog", false, "Log to syslog")
 
 // Profiling
@@ -143,6 +144,9 @@ func findHandler(method, path string) (routingEntry, []string) {
 func handler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	start := time.Now()
+	if *logAccess {
+		log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
+	}
 	route, hparts := findHandler(req.Method, req.URL.Path)
 	wd := time.AfterFunc(route.Deadline, func() {
 		log.Printf("%v:%v is taking longer than %v",
