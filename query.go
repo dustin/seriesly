@@ -18,7 +18,7 @@ var timeoutError = errors.New("query timed out")
 
 type ptrval struct {
 	di       *couchstore.DocInfo
-	val      *string
+	val      interface{}
 	included bool
 }
 
@@ -130,15 +130,12 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 	for i, p := range ptrs {
 		val := fetched[p]
 		switch x := val.(type) {
-		case string:
-			pv.val = &x
-			chs[i] <- pv
 		case int, uint, int64, float64, uint64, bool:
 			v := fmt.Sprintf("%v", val)
-			pv.val = &v
+			pv.val = v
 			chs[i] <- pv
 		default:
-			log.Printf("Ignoring %T", val)
+			pv.val = x
 			chs[i] <- pv
 		}
 	}
@@ -345,9 +342,12 @@ func convertTofloat64(in chan ptrval) chan float64 {
 		defer close(ch)
 		for v := range in {
 			if v.included && v.val != nil {
-				x, err := strconv.ParseFloat(*v.val, 64)
-				if err == nil {
-					ch <- x
+				switch value := v.val.(type) {
+				case string:
+					x, err := strconv.ParseFloat(value, 64)
+					if err == nil {
+						ch <- x
+					}
 				}
 			}
 		}
@@ -364,32 +364,39 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 		var preval float64
 
 		// First, find a part of the stream that has usable data.
+	FIND_USABLE:
 		for v := range in {
 			if v.di != nil && v.val != nil {
-				x, err := strconv.ParseFloat(*v.val, 64)
-				if err == nil {
-					prevts = parseKey(v.di.ID())
-					preval = x
-					break
+				switch value := v.val.(type) {
+				case string:
+					x, err := strconv.ParseFloat(value, 64)
+					if err == nil {
+						prevts = parseKey(v.di.ID())
+						preval = x
+						break FIND_USABLE
+					}
 				}
 			}
 		}
 		// Then emit floats based on deltas from previous values.
 		for v := range in {
 			if v.di != nil && v.val != nil {
-				x, err := strconv.ParseFloat(*v.val, 64)
-				if err == nil {
-					thists := parseKey(v.di.ID())
+				switch value := v.val.(type) {
+				case string:
+					x, err := strconv.ParseFloat(value, 64)
+					if err == nil {
+						thists := parseKey(v.di.ID())
 
-					val := ((x - preval) /
-						(float64(thists-prevts) / 1e9))
+						val := ((x - preval) /
+							(float64(thists-prevts) / 1e9))
 
-					if !math.IsNaN(val) {
-						ch <- val
+						if !math.IsNaN(val) {
+							ch <- val
+						}
+
+						prevts = thists
+						preval = x
 					}
-
-					prevts = thists
-					preval = x
 				}
 			}
 		}
@@ -400,7 +407,7 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 
 var reducers = map[string]Reducer{
 	"identity": func(input chan ptrval) interface{} {
-		rv := []*string{}
+		rv := []interface{}{}
 		for s := range input {
 			if s.included {
 				rv = append(rv, s.val)
@@ -412,7 +419,7 @@ var reducers = map[string]Reducer{
 		var rv interface{}
 		for v := range input {
 			if rv == nil && v.included && v.val != nil {
-				rv = *v.val
+				rv = v.val
 			}
 		}
 		return rv
