@@ -166,7 +166,7 @@ func TestEmptyReducers(t *testing.T) {
 }
 
 func TestNilReducers(t *testing.T) {
-	emptyInput := []interface{}{}
+	emptyInput := []interface{}{nil}
 	tests := []struct {
 		reducer string
 		exp     interface{}
