@@ -507,4 +507,36 @@ var reducers = map[string]Reducer{
 		}
 		return rv
 	},
+	"obj_keys": func(input chan ptrval) interface{} {
+		rv := []string{}
+		for v := range input {
+			if v.included {
+				switch value := v.val.(type) {
+				case map[string]interface{}:
+					for mapk, _ := range value {
+						rv = append(rv, mapk)
+					}
+				}
+			}
+		}
+		return rv
+	},
+	"obj_distinct_keys": func(input chan ptrval) interface{} {
+		ukm := map[string]bool{}
+		for v := range input {
+			if v.included {
+				switch value := v.val.(type) {
+				case map[string]interface{}:
+					for mapk, _ := range value {
+						ukm[mapk] = true
+					}
+				}
+			}
+		}
+		rv := make([]string, 0, len(ukm))
+		for k := range ukm {
+			rv = append(rv, k)
+		}
+		return rv
+	},
 }

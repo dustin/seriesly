@@ -17,7 +17,10 @@ var nextValue = "29"
 var bigInput []byte
 
 func init() {
-	s := []interface{}{"31", "63", "foo", "17"}
+	s := []interface{}{"31", "63", "foo", "17",
+		map[string]interface{}{"key": "value1"},
+		map[string]interface{}{"key": "value2"},
+		map[string]interface{}{"key": "value3"}}
 	for i := range s {
 		testInput = append(testInput, s[i])
 	}
@@ -98,16 +101,18 @@ func TestReducers(t *testing.T) {
 		exp     interface{}
 	}{
 		{"any", "31"},
-		{"count", 4},
+		{"count", 7},
 		{"sum", float64(111)},
 		{"sumsq", float64(5219)},
 		{"max", float64(63)},
 		{"min", float64(17)},
 		{"avg", float64(37)},
 		{"c_min", float64(-23)},
-		{"c_avg", float64(7)},
+		{"c_avg", float64(4)},
 		{"c_max", float64(32)},
 		{"identity", testInput},
+		{"obj_keys", []string{"key", "key", "key"}},
+		{"obj_distinct_keys", []string{"key"}},
 	}
 
 	for _, test := range tests {
@@ -137,6 +142,8 @@ func TestEmptyReducers(t *testing.T) {
 		{"c_avg", math.NaN()},
 		{"c_max", math.NaN()},
 		{"identity", emptyInput},
+		{"obj_keys", []string{}},
+		{"obj_distinct_keys", []string{}},
 	}
 
 	eq := func(a, b interface{}) bool {
@@ -175,6 +182,8 @@ func TestNilReducers(t *testing.T) {
 		{"c_avg", math.NaN()},
 		{"c_max", math.NaN()},
 		{"identity", emptyInput},
+		{"obj_keys", []string{}},
+		{"obj_distinct_keys", []string{}},
 	}
 
 	eq := func(a, b interface{}) bool {
