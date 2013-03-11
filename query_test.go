@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"math"
 	"reflect"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-couchstore"
+	"github.com/dustin/gojson"
 )
 
 var testInput = []*string{nil}

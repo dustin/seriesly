@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"hash/fnv"
 	"log"
 	"math"
 	"strconv"
 	"time"
 
+	"github.com/dustin/gojson"
 	"github.com/dustin/gomemcached"
 	"github.com/dustin/gomemcached/client"
 )

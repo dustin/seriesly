@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +11,8 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"time"
+
+	"github.com/dustin/gojson"
 )
 
 var dbRoot = flag.String("root", "db", "Root directory for database files.")

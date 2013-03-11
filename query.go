@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-jsonpointer"
+	"github.com/dustin/gojson"
 )
 
 var timeoutError = errors.New("query timed out")

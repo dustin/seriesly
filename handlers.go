@@ -2,7 +2,6 @@ package main
 
 import (
 	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-humanize"
+	"github.com/dustin/gojson"
 )
 
 func serverInfo(parts []string, w http.ResponseWriter, req *http.Request) {
@@ -80,6 +80,12 @@ func putDocument(args []string, w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		emitError(400, w, "Bad Request",
 			fmt.Sprintf("Error reading body: %v", err))
+		return
+	}
+
+	err = json.Validate(body)
+	if err != nil {
+		emitError(400, w, "Error parsing JSON data", err.Error())
 		return
 	}
 
