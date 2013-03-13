@@ -219,14 +219,3 @@ func TestPointers(t *testing.T) {
 	}
 
 }
-
-func BenchmarkJSONParser(b *testing.B) {
-	b.SetBytes(int64(len(bigInput)))
-	for i := 0; i < b.N; i++ {
-		m := map[string]interface{}{}
-		err := json.Unmarshal(bigInput, &m)
-		if err != nil {
-			b.Fatalf("Error unmarshaling json: %v", err)
-		}
-	}
-}
