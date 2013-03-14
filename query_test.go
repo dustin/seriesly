@@ -17,6 +17,7 @@ var bigInput []byte
 
 func init() {
 	s := []interface{}{"31", "63", "foo", "17",
+		"foo", "foo", "foo", "foo",
 		map[string]interface{}{"key": "value1"},
 		map[string]interface{}{"key": "value2"},
 		map[string]interface{}{"key": "value3"}}
@@ -100,18 +101,19 @@ func TestReducers(t *testing.T) {
 		exp     interface{}
 	}{
 		{"any", "31"},
-		{"count", 7},
+		{"count", 11},
 		{"sum", float64(111)},
 		{"sumsq", float64(5219)},
 		{"max", float64(63)},
 		{"min", float64(17)},
 		{"avg", float64(37)},
 		{"c_min", float64(-23)},
-		{"c_avg", float64(4)},
+		{"c_avg", float64(3.5)},
 		{"c_max", float64(32)},
 		{"identity", testInput},
 		{"obj_keys", []string{"key", "key", "key"}},
 		{"obj_distinct_keys", []string{"key"}},
+		// distinct reducer tested separately
 	}
 
 	for _, test := range tests {
@@ -121,6 +123,34 @@ func TestReducers(t *testing.T) {
 				test.exp, test.reducer, got)
 			t.Fail()
 		}
+	}
+}
+
+// the order of items returned by distinct is not gauaranteed
+// which makes using TestReducers problematic as is
+// also numeric values become strings do to some interal behavior
+// this could change over time, for now its primarily intended
+// to work with string values
+func TestDistinctReducer(t *testing.T) {
+	test := struct {
+		reducer string
+		exp     []interface{}
+	}{"distinct", []interface{}{"foo", "17", "31", "63"}}
+
+	got := reducers[test.reducer](streamCollection(testInput)).([]interface{})
+	if len(got) != len(test.exp) {
+		t.Errorf("Expected length of result to be %v for %v, got %v",
+			len(test.exp), test.reducer, len(got))
+	}
+OUTER:
+	for _, expval := range test.exp {
+		for _, gotval := range got {
+			if reflect.DeepEqual(expval, gotval) {
+				continue OUTER
+			}
+		}
+		t.Errorf("Expected result to contain %v for %v, got %v",
+			expval, test.reducer, got)
 	}
 }
 
@@ -143,6 +173,7 @@ func TestEmptyReducers(t *testing.T) {
 		{"identity", emptyInput},
 		{"obj_keys", []string{}},
 		{"obj_distinct_keys", []string{}},
+		{"distinct", emptyInput},
 	}
 
 	eq := func(a, b interface{}) bool {
@@ -183,6 +214,7 @@ func TestNilReducers(t *testing.T) {
 		{"identity", emptyInput},
 		{"obj_keys", []string{}},
 		{"obj_distinct_keys", []string{}},
+		{"distinct", emptyInput},
 	}
 
 	eq := func(a, b interface{}) bool {

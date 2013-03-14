@@ -427,6 +427,28 @@ var reducers = map[string]Reducer{
 		}
 		return rv
 	},
+	"distinct": func(input chan ptrval) interface{} {
+		uvm := map[interface{}]bool{}
+		for v := range input {
+			if v.included {
+
+				switch value := v.val.(type) {
+				case map[string]interface{}:
+				case []interface{}:
+					//unhashable
+					continue
+				default:
+					uvm[value] = true
+				}
+
+			}
+		}
+		rv := make([]interface{}, 0, len(uvm))
+		for k := range uvm {
+			rv = append(rv, k)
+		}
+		return rv
+	},
 	"count": func(input chan ptrval) interface{} {
 		rv := 0
 		for v := range input {
