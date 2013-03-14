@@ -211,9 +211,9 @@ func TestPointers(t *testing.T) {
 		chans = append(chans, make(chan ptrval))
 		go processDoc(di, chans, bigInput, []string{test.pointer}, []string{}, []string{}, true)
 		got := <-chans[0]
-		if test.exp != *got.val {
+		if test.exp != got.val {
 			t.Errorf("Expected %v for %v, got %v",
-				test.exp, test.pointer, *got.val)
+				test.exp, test.pointer, got.val)
 		}
 	}
 
