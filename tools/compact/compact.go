@@ -13,6 +13,8 @@ import (
 
 var verbose = flag.Bool("v", false, "verbosity")
 var noop = flag.Bool("n", false, "don't actually compact")
+var concurrency = flag.Int("j", 2,
+	"number of concurrent compactions")
 
 func init() {
 	log.SetFlags(log.Lmicroseconds)
@@ -80,7 +82,7 @@ func main() {
 	wg := &sync.WaitGroup{}
 	ch := make(chan string)
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < *concurrency; i++ {
 		wg.Add(1)
 		go compact(wg, *u, ch)
 	}
