@@ -116,6 +116,16 @@ func BenchmarkParseTimeCanonicalDirect(b *testing.B) {
 	}
 }
 
+func BenchmarkParseTimeCanonicalStdlib(b *testing.B) {
+	input := "2012-08-28T21:24:35.37465188Z"
+	for i := 0; i < b.N; i++ {
+		_, err := time.Parse(time.RFC3339, input)
+		if err != nil {
+			b.Fatalf("Error on %v - %v", input, err)
+		}
+	}
+}
+
 func BenchmarkParseTimeCanonical(b *testing.B) {
 	benchTimeParsing(b, "2012-08-28T21:24:35.37465188Z")
 }
