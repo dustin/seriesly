@@ -187,7 +187,8 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 	going := true
 	finished := int32(0)
-	for going || (q.started-finished) > 0 {
+	walkComplete := false
+	for going {
 		select {
 		case po := <-q.out:
 			if finished != 0 {
@@ -208,8 +209,12 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 				output = ioutil.Discard
 				q.before = time.Time{}
 			}
+			going = (q.started-finished > 0) || !walkComplete
 		case err = <-q.cherr:
-			going = false
+			if err != nil {
+				log.Printf("Walk completed with err: %v", err)
+			}
+			walkComplete = true
 		}
 	}
 
