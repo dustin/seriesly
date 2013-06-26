@@ -301,8 +301,8 @@ func runQuery(q *queryIn) {
 	q.cherr <- err
 }
 
-func queryExecutor(ch <-chan *queryIn) {
-	for q := range ch {
+func queryExecutor() {
+	for q := range queryInput {
 		if time.Now().Before(q.before) {
 			runQuery(q)
 		} else {
@@ -314,8 +314,7 @@ func queryExecutor(ch <-chan *queryIn) {
 }
 
 func executeQuery(dbname, from, to string, group int,
-	ptrs []string, reds []string, filters []string, filtervals []string) *queryIn {
-
+	ptrs, reds, filters, filtervals []string) *queryIn {
 	now := time.Now()
 
 	rv := &queryIn{

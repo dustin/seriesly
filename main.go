@@ -243,7 +243,7 @@ func main() {
 
 	queryInput = make(chan *queryIn, *queryBacklog)
 	for i := 0; i < *queryWorkers; i++ {
-		go queryExecutor(queryInput)
+		go queryExecutor()
 	}
 
 	if *pprofFile != "" {
