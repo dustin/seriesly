@@ -17,7 +17,7 @@ var cacheInputSet chan *processOut
 
 func cacheReceiveLoop(client *memcached.Client, out chan *processOut) {
 	for {
-		res, err := client.Receive()
+		res, err := memcached.UnwrapMemcachedError(client.Receive())
 		if err != nil {
 			log.Printf("Error receiving from memcache: %v", err)
 			return
