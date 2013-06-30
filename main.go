@@ -143,7 +143,6 @@ func findHandler(method, path string) (routingEntry, []string) {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	defer req.Body.Close()
 	start := time.Now()
 	if *logAccess {
 		log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
