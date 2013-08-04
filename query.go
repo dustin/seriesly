@@ -197,7 +197,8 @@ func process_docs(pi *processIn) {
 	results := make([]interface{}, len(pi.ptrs))
 	for i := 0; i < len(pi.ptrs); i++ {
 		results[i] = <-resultchs[i]
-		if f, fok := results[i].(float64); fok && math.IsNaN(f) {
+		if f, fok := results[i].(float64); fok &&
+			(math.IsNaN(f) || math.IsInf(f, 0)) {
 			results[i] = nil
 		}
 	}
@@ -392,7 +393,7 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 						val := ((x - preval) /
 							(float64(thists-prevts) / 1e9))
 
-						if !math.IsNaN(val) {
+						if !(math.IsNaN(val) || math.IsInf(val, 0)) {
 							ch <- val
 						}
 
@@ -474,7 +475,7 @@ var reducers = map[string]Reducer{
 	"max": func(input chan ptrval) interface{} {
 		rv := math.NaN()
 		for v := range convertTofloat64(input) {
-			if v > rv || math.IsNaN(rv) {
+			if v > rv || math.IsNaN(rv) || math.IsInf(rv, 0) {
 				rv = v
 			}
 		}
@@ -483,7 +484,7 @@ var reducers = map[string]Reducer{
 	"min": func(input chan ptrval) interface{} {
 		rv := math.NaN()
 		for v := range convertTofloat64(input) {
-			if v < rv || math.IsNaN(rv) {
+			if v < rv || math.IsNaN(rv) || math.IsInf(rv, 0) {
 				rv = v
 			}
 		}
@@ -504,7 +505,7 @@ var reducers = map[string]Reducer{
 	"c_min": func(input chan ptrval) interface{} {
 		rv := math.NaN()
 		for v := range convertTofloat64Rate(input) {
-			if v < rv || math.IsNaN(rv) {
+			if v < rv || math.IsNaN(rv) || math.IsInf(rv, 0) {
 				rv = v
 			}
 		}
@@ -525,7 +526,7 @@ var reducers = map[string]Reducer{
 	"c_max": func(input chan ptrval) interface{} {
 		rv := math.NaN()
 		for v := range convertTofloat64Rate(input) {
-			if v > rv || math.IsNaN(rv) {
+			if v > rv || math.IsNaN(rv) || math.IsInf(rv, 0) {
 				rv = v
 			}
 		}
