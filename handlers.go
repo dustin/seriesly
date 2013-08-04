@@ -220,9 +220,12 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 
 	output.Write([]byte{'}'})
 
-	log.Printf("Completed query processing in %v, %v keys, %v chunks",
-		time.Since(q.start), humanize.Comma(int64(q.totalKeys)),
-		humanize.Comma(int64(q.started)))
+	duration := time.Since(q.start)
+	if duration > *minQueryLogDuration {
+		log.Printf("Completed query processing in %v, %v keys, %v chunks",
+			duration, humanize.Comma(int64(q.totalKeys)),
+			humanize.Comma(int64(q.started)))
+	}
 }
 
 func deleteBulk(args []string, w http.ResponseWriter, req *http.Request) {

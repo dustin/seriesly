@@ -31,6 +31,8 @@ var cacheWorkers = flag.Int("cacheWorkers", 4, "Number of cache workers")
 var verbose = flag.Bool("v", false, "Verbose logging")
 var logAccess = flag.Bool("logAccess", false, "Log HTTP Requests")
 var useSyslog = flag.Bool("syslog", false, "Log to syslog")
+var minQueryLogDuration = flag.Duration("minQueryLogDuration",
+	time.Millisecond*100, "minimum query duration to log")
 
 // Profiling
 var pprofFile = flag.String("proFile", "", "File to write profiling info into")
