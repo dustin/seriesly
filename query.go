@@ -502,6 +502,13 @@ var reducers = map[string]Reducer{
 		}
 		return math.NaN()
 	},
+	"c": func(input chan ptrval) interface{} {
+		sum := float64(0)
+		for v := range convertTofloat64Rate(input) {
+			sum += v
+		}
+		return sum
+	},
 	"c_min": func(input chan ptrval) interface{} {
 		rv := math.NaN()
 		for v := range convertTofloat64Rate(input) {
