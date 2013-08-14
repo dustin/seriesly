@@ -314,6 +314,11 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	limit, err := strconv.Atoi(req.FormValue("limit"))
+	if err != nil {
+		limit = 2000000000
+	}
+
 	output := io.Writer(w)
 
 	if canGzip(req) {
@@ -331,7 +336,12 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 
 	seenOne := false
 
+	walked := 0
 	err = dbwalk(args[0], from, to, func(k string, v []byte) error {
+		if walked > limit {
+			return io.EOF
+		}
+		walked++
 		if seenOne {
 			output.Write([]byte(",\n"))
 		} else {
