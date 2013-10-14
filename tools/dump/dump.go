@@ -87,7 +87,7 @@ func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
 		n, err := dumpOne(db, u.String())
 		maybeFatal(err, "Error dumping %v: %v", u.String(), err)
 
-		vlog("Dumped %v records of %v in %v",
+		vlog("Dumped %v of %v in %v",
 			humanize.Bytes(uint64(n)), db, time.Since(start))
 	}
 }
