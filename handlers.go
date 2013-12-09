@@ -181,16 +181,19 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	} else {
 		output = w
 	}
-	w.WriteHeader(200)
-
-	output.Write([]byte{'{'})
 
 	going := true
 	finished := int32(0)
+	started := false
 	walkComplete := false
 	for going {
 		select {
 		case po := <-q.out:
+			if !started {
+				started = true
+				w.WriteHeader(200)
+				output.Write([]byte{'{'})
+			}
 			if finished != 0 {
 				output.Write([]byte{',', '\n'})
 			}
@@ -211,6 +214,10 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 			}
 			going = (q.started-finished > 0) || !walkComplete
 		case err = <-q.cherr:
+			if !started {
+				w.WriteHeader(500)
+				fmt.Fprintf(output, "Error beginning traversal: %v", err)
+			}
 			if err != nil {
 				log.Printf("Walk completed with err: %v", err)
 				going = false
@@ -219,7 +226,9 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	output.Write([]byte{'}'})
+	if started {
+		output.Write([]byte{'}'})
+	}
 
 	duration := time.Since(q.start)
 	if duration > *minQueryLogDuration {
