@@ -213,6 +213,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 		case err = <-q.cherr:
 			if err != nil {
 				log.Printf("Walk completed with err: %v", err)
+				going = false
 			}
 			walkComplete = true
 		}
