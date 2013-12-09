@@ -23,7 +23,7 @@ var timeFormats = []string{
 	"2006",
 }
 
-var unparseableTimestamp = errors.New("unparsable timestamp")
+var errUnparseableTimestamp = errors.New("unparsable timestamp")
 
 var powTable = []int{
 	10e8,
@@ -41,12 +41,12 @@ var powTable = []int{
 // Hand crafted this parser since it's a really common path.
 func parseCanonicalTime(in string) (time.Time, error) {
 	if len(in) < 20 || in[len(in)-1] != 'Z' {
-		return time.Time{}, unparseableTimestamp
+		return time.Time{}, errUnparseableTimestamp
 	}
 
 	if !(in[4] == '-' && in[7] == '-' && in[10] == 'T' &&
 		in[13] == ':' && in[16] == ':' && (in[19] == '.' || in[19] == 'Z')) {
-		return time.Time{}, fmt.Errorf("Positionally incorrect: %v", in)
+		return time.Time{}, fmt.Errorf("positionally incorrect: %v", in)
 	}
 
 	// 2012-08-28T21:24:35.37465188Z
@@ -56,32 +56,32 @@ func parseCanonicalTime(in string) (time.Time, error) {
 
 	year, err := strconv.Atoi(in[0:4])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("Error parsing year: %v", err)
+		return time.Time{}, fmt.Errorf("error parsing year: %v", err)
 	}
 
 	month, err := strconv.Atoi(in[5:7])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("Error parsing month: %v", err)
+		return time.Time{}, fmt.Errorf("error parsing month: %v", err)
 	}
 
 	day, err := strconv.Atoi(in[8:10])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("Error parsing day: %v", err)
+		return time.Time{}, fmt.Errorf("error parsing day: %v", err)
 	}
 
 	hour, err := strconv.Atoi(in[11:13])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("Error parsing hour: %v", err)
+		return time.Time{}, fmt.Errorf("error parsing hour: %v", err)
 	}
 
 	minute, err := strconv.Atoi(in[14:16])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("Error parsing minute: %v", err)
+		return time.Time{}, fmt.Errorf("error parsing minute: %v", err)
 	}
 
 	second, err := strconv.Atoi(in[17:19])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("Error parsing second: %v", err)
+		return time.Time{}, fmt.Errorf("error parsing second: %v", err)
 	}
 
 	var nsecstr string
@@ -93,7 +93,7 @@ func parseCanonicalTime(in string) (time.Time, error) {
 	if nsecstr != "" {
 		nsec, err = strconv.Atoi(nsecstr)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("Error parsing nanoseconds: %v", err)
+			return time.Time{}, fmt.Errorf("error parsing nanoseconds: %v", err)
 		}
 	}
 
@@ -129,5 +129,5 @@ func parseTime(in string) (time.Time, error) {
 			return parsed, nil
 		}
 	}
-	return time.Time{}, unparseableTimestamp
+	return time.Time{}, errUnparseableTimestamp
 }

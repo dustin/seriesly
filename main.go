@@ -54,7 +54,7 @@ const dbMatch = "[-%+()$_a-zA-Z0-9]+"
 
 var defaultDeadline = time.Millisecond * 50
 
-var routingTable []routingEntry = []routingEntry{
+var routingTable = []routingEntry{
 	routingEntry{"GET", regexp.MustCompile("^/$"),
 		serverInfo, defaultDeadline},
 	routingEntry{"GET", regexp.MustCompile("^/_static/(.*)"),

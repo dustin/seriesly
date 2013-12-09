@@ -14,7 +14,7 @@ import (
 	"github.com/dustin/gojson"
 )
 
-var timeoutError = errors.New("query timed out")
+var errTimeout = errors.New("query timed out")
 
 type ptrval struct {
 	di       *couchstore.DocInfo
@@ -144,7 +144,7 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 	}
 }
 
-func process_docs(pi *processIn) {
+func processDocs(pi *processIn) {
 
 	result := processOut{pi.cacheKey, pi.key, nil, nil, 0}
 
@@ -219,9 +219,9 @@ func process_docs(pi *processIn) {
 func docProcessor(ch <-chan *processIn) {
 	for pi := range ch {
 		if time.Now().Before(pi.before) {
-			process_docs(pi)
+			processDocs(pi)
 		} else {
-			pi.out <- &processOut{"", pi.key, nil, timeoutError, 0}
+			pi.out <- &processOut{"", pi.key, nil, errTimeout, 0}
 		}
 	}
 }
@@ -239,11 +239,11 @@ func fetchDocs(dbname string, key int64, infos []*couchstore.DocInfo,
 
 func runQuery(q *queryIn) {
 	if len(q.ptrs) == 0 {
-		q.cherr <- fmt.Errorf("At least one pointer is required")
+		q.cherr <- fmt.Errorf("at least one pointer is required")
 		return
 	}
 	if q.group == 0 {
-		q.cherr <- fmt.Errorf("group level cannot be zero.")
+		q.cherr <- fmt.Errorf("group level cannot be zero")
 		return
 	}
 
@@ -309,7 +309,7 @@ func queryExecutor() {
 		} else {
 			log.Printf("Timed out query that's %v late",
 				time.Since(q.before))
-			q.cherr <- timeoutError
+			q.cherr <- errTimeout
 		}
 	}
 }
@@ -545,7 +545,7 @@ var reducers = map[string]Reducer{
 			if v.included {
 				switch value := v.val.(type) {
 				case map[string]interface{}:
-					for mapk, _ := range value {
+					for mapk := range value {
 						rv = append(rv, mapk)
 					}
 				}
@@ -559,7 +559,7 @@ var reducers = map[string]Reducer{
 			if v.included {
 				switch value := v.val.(type) {
 				case map[string]interface{}:
-					for mapk, _ := range value {
+					for mapk := range value {
 						ukm[mapk] = true
 					}
 				}

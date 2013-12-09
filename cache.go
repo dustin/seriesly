@@ -105,7 +105,7 @@ func cacheProcessor(ch <-chan *processIn, chset <-chan *processOut) {
 				}
 			default:
 				// Too old.
-				pi.out <- &processOut{"", pi.key, nil, timeoutError, 0}
+				pi.out <- &processOut{"", pi.key, nil, errTimeout, 0}
 			}
 		case po := <-out:
 			pi, ok := omap[po.cacheOpaque]
