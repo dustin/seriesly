@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dustin/gojson"
+	"github.com/dustin/yellow"
 )
 
 var dbRoot = flag.String("root", "db", "Root directory for database files.")
@@ -145,24 +146,16 @@ func findHandler(method, path string) (routingEntry, []string) {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	start := time.Now()
 	if *logAccess {
 		log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 	}
 	route, hparts := findHandler(req.Method, req.URL.Path)
-	wd := time.AfterFunc(route.Deadline, func() {
-		log.Printf("%v:%v is taking longer than %v",
-			req.Method, req.URL.Path, route.Deadline)
-	})
+	defer yellow.DeadlineLog(route.Deadline, "%v:%v with deadlined at %v",
+		req.Method, req.URL.Path, route.Deadline).Done()
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-type", "application/json")
 	route.Handler(hparts, w, req)
-
-	if !wd.Stop() {
-		log.Printf("%v:%v eventually finished in %v",
-			req.Method, req.URL.Path, time.Since(start))
-	}
 }
 
 func startProfiler() {
