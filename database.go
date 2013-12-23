@@ -57,7 +57,11 @@ func dbBase(n string) string {
 }
 
 func dbopen(name string) (*couchstore.Couchstore, error) {
+	path := dbPath(name)
 	db, err := couchstore.Open(dbPath(name), false)
+	if err == nil {
+		recordDBConn(path, db)
+	}
 	return db, err
 }
 
@@ -66,7 +70,8 @@ func dbcreate(path string) error {
 	if err != nil {
 		return err
 	}
-	db.Close()
+	recordDBConn(path, db)
+	closeDBConn(db)
 	return nil
 }
 
@@ -126,7 +131,7 @@ func dbCompact(dq *dbWriter, bulk couchstore.BulkWriter, queued int,
 	}
 
 	log.Printf("Reopening post-compact")
-	dq.db.Close()
+	closeDBConn(dq.db)
 
 	dq.db, err = dbopen(dq.dbname)
 	if err != nil {
@@ -146,7 +151,7 @@ func dbWriteLoop(dq *dbWriter) {
 		case <-dq.quit:
 			bulk.Close()
 			bulk.Commit()
-			dq.db.Close()
+			closeDBConn(dq.db)
 			return
 		case qi := <-dq.ch:
 			switch qi.op {
@@ -259,7 +264,7 @@ func dbGetDoc(dbname, id string) ([]byte, error) {
 		log.Printf("Error opening db: %v - %v", dbname, err)
 		return []byte{}, err
 	}
-	defer db.Close()
+	defer closeDBConn(db)
 
 	doc, _, err := db.Get(id)
 	if err != nil {
@@ -274,7 +279,7 @@ func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
 		log.Printf("Error opening db: %v - %v", dbname, err)
 		return err
 	}
-	defer db.Close()
+	defer closeDBConn(db)
 
 	return db.WalkDocs(from, func(d *couchstore.Couchstore,
 		di *couchstore.DocInfo, doc *couchstore.Document) error {
@@ -292,7 +297,7 @@ func dbwalkKeys(dbname, from, to string, f func(k string) error) error {
 		log.Printf("Error opening db: %v - %v", dbname, err)
 		return err
 	}
-	defer db.Close()
+	defer closeDBConn(db)
 
 	return db.Walk(from, func(d *couchstore.Couchstore,
 		di *couchstore.DocInfo) error {

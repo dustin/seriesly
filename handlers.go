@@ -45,7 +45,7 @@ func createDB(parts []string, w http.ResponseWriter, req *http.Request) {
 func checkDB(args []string, w http.ResponseWriter, req *http.Request) {
 	dbname := args[0]
 	if db, err := dbopen(dbname); err == nil {
-		db.Close()
+		closeDBConn(db)
 		w.WriteHeader(200)
 	} else {
 		w.WriteHeader(404)
@@ -381,7 +381,7 @@ func dbInfo(args []string, w http.ResponseWriter, req *http.Request) {
 		emitError(500, w, "Error opening DB", err.Error())
 		return
 	}
-	defer db.Close()
+	defer closeDBConn(db)
 
 	inf, err := db.Info()
 	if err == nil {

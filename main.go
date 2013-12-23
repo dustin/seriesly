@@ -60,6 +60,8 @@ var routingTable = []routingEntry{
 		serverInfo, defaultDeadline},
 	routingEntry{"GET", regexp.MustCompile("^/_static/(.*)"),
 		staticHandler, defaultDeadline},
+	routingEntry{"GET", regexp.MustCompile("^/_debug/open$"),
+		debugListOpenDBs, defaultDeadline},
 	// Database stuff
 	routingEntry{"GET", regexp.MustCompile("^/_all_dbs$"),
 		listDatabases, defaultDeadline},

@@ -158,7 +158,7 @@ func processDocs(pi *processIn) {
 		pi.out <- &result
 		return
 	}
-	defer db.Close()
+	defer closeDBConn(db)
 
 	chans := make([]chan ptrval, 0, len(pi.ptrs))
 	resultchs := make([]chan interface{}, 0, len(pi.ptrs))
@@ -253,7 +253,7 @@ func runQuery(q *queryIn) {
 		q.cherr <- err
 		return
 	}
-	defer db.Close()
+	defer closeDBConn(db)
 
 	chunk := int64(time.Duration(q.group) * time.Millisecond)
 
