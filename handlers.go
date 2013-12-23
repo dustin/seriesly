@@ -214,11 +214,11 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 			}
 			going = (q.started-finished > 0) || !walkComplete
 		case err = <-q.cherr:
-			if !started {
-				w.WriteHeader(500)
-				fmt.Fprintf(output, "Error beginning traversal: %v", err)
-			}
 			if err != nil {
+				if !started {
+					w.WriteHeader(500)
+					fmt.Fprintf(output, "Error beginning traversal: %v", err)
+				}
 				log.Printf("Walk completed with err: %v", err)
 				going = false
 			}
