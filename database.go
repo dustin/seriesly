@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -32,6 +33,18 @@ type dbWriter struct {
 	ch     chan dbqitem
 	quit   chan bool
 	db     *couchstore.Couchstore
+}
+
+var errClosed = errors.New("closed")
+
+func (w *dbWriter) Close() error {
+	select {
+	case <-w.quit:
+		return errClosed
+	default:
+	}
+	close(w.quit)
+	return nil
 }
 
 var dbLock = sync.Mutex{}
@@ -81,8 +94,7 @@ func dbRemoveConn(dbname string) {
 
 	writer := dbConns[dbname]
 	if writer != nil && writer.quit != nil {
-		close(writer.quit)
-		writer.quit = nil
+		writer.Close()
 	}
 	delete(dbConns, dbname)
 }
@@ -159,13 +171,13 @@ func dbWriteLoop(dq *dbWriter) {
 			bulk.Close()
 			bulk.Commit()
 			closeDBConn(dq.db)
+			dbRemoveConn(dq.dbname)
+			log.Printf("Closed %v", dq.dbname)
 			return
 		case <-liveTracker.C:
 			if queued == 0 && liveOps == 0 {
 				log.Printf("Closing idle DB: %v", dq.dbname)
-				closeDBConn(dq.db)
-				dbRemoveConn(dq.dbname)
-				return
+				close(dq.quit)
 			}
 			liveOps = 0
 		case qi := <-dq.ch:
@@ -230,24 +242,26 @@ func dbWriteFun(dbname string) (*dbWriter, error) {
 	return writer, nil
 }
 
-func getOrCreateDB(dbname string) (*dbWriter, error) {
+func getOrCreateDB(dbname string) (*dbWriter, bool, error) {
 	dbLock.Lock()
 	defer dbLock.Unlock()
 
 	writer := dbConns[dbname]
 	var err error
+	opened := false
 	if writer == nil {
 		writer, err = dbWriteFun(dbname)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		dbConns[dbname] = writer
+		opened = true
 	}
-	return writer, nil
+	return writer, opened, nil
 }
 
 func dbstore(dbname string, k string, body []byte) error {
-	writer, err := getOrCreateDB(dbname)
+	writer, _, err := getOrCreateDB(dbname)
 	if err != nil {
 		return err
 	}
@@ -258,9 +272,13 @@ func dbstore(dbname string, k string, body []byte) error {
 }
 
 func dbcompact(dbname string) error {
-	writer, err := getOrCreateDB(dbname)
+	writer, opened, err := getOrCreateDB(dbname)
 	if err != nil {
 		return err
+	}
+	if opened {
+		log.Printf("Requesting post-compaction close of %v", dbname)
+		defer writer.Close()
 	}
 
 	cherr := make(chan error)
