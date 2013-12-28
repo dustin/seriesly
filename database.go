@@ -75,16 +75,19 @@ func dbcreate(path string) error {
 	return nil
 }
 
-func dbdelete(dbname string) error {
+func dbRemoveConn(dbname string) {
 	dbLock.Lock()
 	defer dbLock.Unlock()
 
 	writer := dbConns[dbname]
-	if writer != nil {
-		writer.quit <- true
+	if writer != nil && writer.quit != nil {
+		close(writer.quit)
+		writer.quit = nil
 	}
 	delete(dbConns, dbname)
+}
 
+func dbdelete(dbname string) error {
 	return os.Remove(dbPath(dbname))
 }
 
@@ -145,6 +148,10 @@ func dbWriteLoop(dq *dbWriter) {
 	bulk := dq.db.Bulk()
 
 	t := time.NewTimer(*flushTime)
+	defer t.Stop()
+	liveTracker := time.NewTicker(*liveTime)
+	defer liveTracker.Stop()
+	liveOps := 0
 
 	for {
 		select {
@@ -153,7 +160,16 @@ func dbWriteLoop(dq *dbWriter) {
 			bulk.Commit()
 			closeDBConn(dq.db)
 			return
+		case <-liveTracker.C:
+			if queued == 0 && liveOps == 0 {
+				log.Printf("Closing idle DB: %v", dq.dbname)
+				closeDBConn(dq.db)
+				dbRemoveConn(dq.dbname)
+				return
+			}
+			liveOps = 0
 		case qi := <-dq.ch:
+			liveOps++
 			switch qi.op {
 			case db_store_item:
 				bulk.Set(couchstore.NewDocInfo(qi.k,
@@ -179,8 +195,7 @@ func dbWriteLoop(dq *dbWriter) {
 						queued, time.Since(start))
 				}
 				queued = 0
-				t.Stop()
-				t = time.NewTimer(*flushTime)
+				t.Reset(*flushTime)
 			}
 		case <-t.C:
 			if queued > 0 {
@@ -192,7 +207,7 @@ func dbWriteLoop(dq *dbWriter) {
 				}
 				queued = 0
 			}
-			t = time.NewTimer(*flushTime)
+			t.Reset(*flushTime)
 		}
 	}
 }

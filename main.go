@@ -19,6 +19,8 @@ import (
 var dbRoot = flag.String("root", "db", "Root directory for database files.")
 var flushTime = flag.Duration("flushDelay", time.Second*5,
 	"Maximum amount of time to wait before flushing")
+var liveTime = flag.Duration("liveTime", time.Minute*5,
+	"How long to keep an idle DB open")
 var maxOpQueue = flag.Int("maxOpQueue", 1000,
 	"Maximum number of queued items before flushing")
 var staticPath = flag.String("static", "static", "Path to static data")
