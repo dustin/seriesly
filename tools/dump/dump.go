@@ -18,7 +18,7 @@ import (
 
 var verbose = flag.Bool("v", false, "verbosity")
 var concurrency = flag.Int("j", 2,
-	"number of concurrent compactions")
+	"number of concurrent dumps")
 
 func init() {
 	log.SetFlags(log.Lmicroseconds)
