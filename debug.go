@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/dustin/go-couchstore"
+	"github.com/cznic/kv"
 )
 
 type frameSnap []uintptr
@@ -30,9 +30,9 @@ type dbOpenState struct {
 }
 
 var openConnLock = sync.Mutex{}
-var openConns = map[*couchstore.Couchstore]dbOpenState{}
+var openConns = map[*kv.DB]dbOpenState{}
 
-func recordDBConn(path string, db *couchstore.Couchstore) {
+func recordDBConn(path string, db *kv.DB) {
 	callers := make([]uintptr, 32)
 	n := runtime.Callers(2, callers)
 	openConnLock.Lock()
@@ -40,7 +40,7 @@ func recordDBConn(path string, db *couchstore.Couchstore) {
 	openConnLock.Unlock()
 }
 
-func closeDBConn(db *couchstore.Couchstore) {
+func closeDBConn(db *kv.DB) {
 	db.Close()
 	openConnLock.Lock()
 	_, ok := openConns[db]

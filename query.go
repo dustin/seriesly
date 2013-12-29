@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-jsonpointer"
 	"github.com/dustin/gojson"
 )
@@ -17,7 +16,7 @@ import (
 var errTimeout = errors.New("query timed out")
 
 type ptrval struct {
-	di       *couchstore.DocInfo
+	key      []byte
 	val      interface{}
 	included bool
 }
@@ -36,12 +35,16 @@ func (p processOut) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{"v": p.value})
 }
 
+type kvpair struct {
+	k, v []byte
+}
+
 type processIn struct {
 	cacheKey   string
 	dbname     string
 	key        int64
-	infos      []*couchstore.DocInfo
-	nextInfo   *couchstore.DocInfo
+	docs       []kvpair
+	nextKey    []byte
 	ptrs       []string
 	reds       []string
 	before     time.Time
@@ -83,12 +86,10 @@ func resolveFetch(j []byte, keys []string) map[string]interface{} {
 	return rv
 }
 
-func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
-	doc []byte, ptrs []string,
-	filters []string, filtervals []string,
-	included bool) {
+func processDoc(key []byte, chs []chan ptrval, doc []byte, ptrs []string,
+	filters []string, filtervals []string, included bool) {
 
-	pv := ptrval{di, nil, included}
+	pv := ptrval{key, nil, included}
 
 	// Find all keys for filters and comparisons so we can do a
 	// single pass through the document.
@@ -130,7 +131,7 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 	for i, p := range ptrs {
 		val := fetched[p]
 		if p == "_id" {
-			val = di.ID()
+			val = key
 		}
 		switch x := val.(type) {
 		case int, uint, int64, float64, uint64, bool:
@@ -174,23 +175,13 @@ func processDocs(pi *processIn) {
 	go func() {
 		defer closeAll(chans)
 
-		dodoc := func(di *couchstore.DocInfo, included bool) {
-			doc, err := db.GetFromDocInfo(di)
-			if err == nil {
-				processDoc(di, chans, doc.Value(), pi.ptrs,
-					pi.filters, pi.filtervals, included)
-			} else {
-				for i := range pi.ptrs {
-					chans[i] <- ptrval{di, nil, included}
-				}
-			}
+		for _, pair := range pi.docs {
+			processDoc(pair.k, chans, pair.v, pi.ptrs,
+				pi.filters, pi.filtervals, true)
 		}
-
-		for _, di := range pi.infos {
-			dodoc(di, true)
-		}
-		if pi.nextInfo != nil {
-			dodoc(pi.nextInfo, false)
+		if pi.nextKey != nil {
+			processDoc(nil, chans, nil, pi.ptrs,
+				pi.filters, pi.filtervals, false)
 		}
 	}()
 
@@ -226,12 +217,12 @@ func docProcessor(ch <-chan *processIn) {
 	}
 }
 
-func fetchDocs(dbname string, key int64, infos []*couchstore.DocInfo,
-	nextInfo *couchstore.DocInfo, ptrs []string, reds []string,
+func fetchDocs(dbname string, key int64, docs []kvpair,
+	nextKey []byte, ptrs []string, reds []string,
 	filters []string, filtervals []string,
 	before time.Time, out chan<- *processOut) {
 
-	i := processIn{"", dbname, key, infos, nextInfo,
+	i := processIn{"", dbname, key, docs, nextKey,
 		ptrs, reds, before, filters, filtervals, out}
 
 	cacheInput <- &i
@@ -247,38 +238,23 @@ func runQuery(q *queryIn) {
 		return
 	}
 
-	db, err := dbopen(q.dbname)
-	if err != nil {
-		log.Printf("Error opening db: %v - %v", q.dbname, err)
-		q.cherr <- err
-		return
-	}
-	defer closeDBConn(db)
-
 	chunk := int64(time.Duration(q.group) * time.Millisecond)
 
-	infos := []*couchstore.DocInfo{}
+	docs := []kvpair{}
 	g := int64(0)
 	nextg := ""
 
-	err = db.Walk(q.from, func(d *couchstore.Couchstore,
-		di *couchstore.DocInfo) error {
-		kstr := di.ID()
-		var err error
-		if q.to != "" && kstr >= q.to {
-			err = couchstore.StopIteration
-		}
-
+	err := dbwalk(q.dbname, q.from, q.to, func(k, v []byte) error {
 		atomic.AddInt32(&q.totalKeys, 1)
-
+		kstr := string(k)
 		if kstr >= nextg {
-			if len(infos) > 0 {
+			if len(docs) > 0 {
 				atomic.AddInt32(&q.started, 1)
-				fetchDocs(q.dbname, g, infos, di,
+				fetchDocs(q.dbname, g, docs, k,
 					q.ptrs, q.reds, q.filters, q.filtervals,
 					q.before, q.out)
 
-				infos = make([]*couchstore.DocInfo, 0, len(infos))
+				docs = make([]kvpair, 0, len(docs))
 			}
 
 			k := parseKey(kstr)
@@ -287,14 +263,13 @@ func runQuery(q *queryIn) {
 			nextgt := time.Unix(nextgi/1e9, nextgi%1e9).UTC()
 			nextg = nextgt.Format(time.RFC3339Nano)
 		}
-		infos = append(infos, di)
-
-		return err
+		docs = append(docs, kvpair{k, v})
+		return nil
 	})
 
-	if err == nil && len(infos) > 0 {
+	if err == nil && len(docs) > 0 {
 		atomic.AddInt32(&q.started, 1)
-		fetchDocs(q.dbname, g, infos, nil,
+		fetchDocs(q.dbname, g, docs, nil,
 			q.ptrs, q.reds, q.filters, q.filtervals,
 			q.before, q.out)
 	}
@@ -369,12 +344,12 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 		// First, find a part of the stream that has usable data.
 	FIND_USABLE:
 		for v := range in {
-			if v.di != nil && v.val != nil {
+			if v.key != nil && v.val != nil {
 				switch value := v.val.(type) {
 				case string:
 					x, err := strconv.ParseFloat(value, 64)
 					if err == nil {
-						prevts = parseKey(v.di.ID())
+						prevts = parseKey(string(v.key))
 						preval = x
 						break FIND_USABLE
 					}
@@ -383,12 +358,12 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 		}
 		// Then emit floats based on deltas from previous values.
 		for v := range in {
-			if v.di != nil && v.val != nil {
+			if v.key != nil && v.val != nil {
 				switch value := v.val.(type) {
 				case string:
 					x, err := strconv.ParseFloat(value, 64)
 					if err == nil {
-						thists := parseKey(v.di.ID())
+						thists := parseKey(string(v.key))
 
 						val := ((x - preval) /
 							(float64(thists-prevts) / 1e9))

@@ -156,8 +156,8 @@ func cacheProcessor(ch <-chan *processIn, chset <-chan *processOut) {
 
 func cacheKey(p *processIn) string {
 	h := fnv.New64()
-	for _, i := range p.infos {
-		i.WriteIDTo(h)
+	for _, pair := range p.docs {
+		h.Write(pair.k)
 	}
 	for i := range p.ptrs {
 		h.Write([]byte(p.ptrs[i]))

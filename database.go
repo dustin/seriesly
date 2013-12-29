@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -9,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dustin/go-couchstore"
+	"github.com/cznic/kv"
 )
 
 type dbOperation uint8
@@ -17,10 +18,9 @@ type dbOperation uint8
 const (
 	opStoreItem = dbOperation(iota)
 	opDeleteItem
-	opCompact
 )
 
-const dbExt = ".couch"
+const dbExt = ".kv"
 
 type dbqitem struct {
 	dbname string
@@ -34,7 +34,7 @@ type dbWriter struct {
 	dbname string
 	ch     chan dbqitem
 	quit   chan bool
-	db     *couchstore.Couchstore
+	db     *kv.DB
 }
 
 var errClosed = errors.New("closed")
@@ -71,9 +71,9 @@ func dbBase(n string) string {
 	return n[left:right]
 }
 
-func dbopen(name string) (*couchstore.Couchstore, error) {
+func dbopen(name string) (*kv.DB, error) {
 	path := dbPath(name)
-	db, err := couchstore.Open(dbPath(name), false)
+	db, err := kv.Open(dbPath(name), &kv.Options{})
 	if err == nil {
 		recordDBConn(path, db)
 	}
@@ -81,7 +81,7 @@ func dbopen(name string) (*couchstore.Couchstore, error) {
 }
 
 func dbcreate(path string) error {
-	db, err := couchstore.Open(path, true)
+	db, err := kv.Create(path, &kv.Options{})
 	if err != nil {
 		return err
 	}
@@ -120,46 +120,8 @@ func dblist(root string) []string {
 	return rv
 }
 
-func dbCompact(dq *dbWriter, bulk couchstore.BulkWriter, queued int,
-	qi dbqitem) (couchstore.BulkWriter, error) {
-	start := time.Now()
-	if queued > 0 {
-		bulk.Commit()
-		if *verbose {
-			log.Printf("Flushed %d items in %v for pre-compact",
-				queued, time.Since(start))
-		}
-		bulk.Close()
-	}
-	dbn := dbPath(dq.dbname)
-	queued = 0
-	start = time.Now()
-	err := dq.db.CompactTo(dbn + ".compact")
-	if err != nil {
-		log.Printf("Error compacting: %v", err)
-		return dq.db.Bulk(), err
-	}
-	log.Printf("Finished compaction of %v in %v", dq.dbname,
-		time.Since(start))
-	err = os.Rename(dbn+".compact", dbn)
-	if err != nil {
-		log.Printf("Error putting compacted data back")
-		return dq.db.Bulk(), err
-	}
-
-	log.Printf("Reopening post-compact")
-	closeDBConn(dq.db)
-
-	dq.db, err = dbopen(dq.dbname)
-	if err != nil {
-		log.Fatalf("Error reopening DB after compaction: %v", err)
-	}
-	return dq.db.Bulk(), nil
-}
-
 func dbWriteLoop(dq *dbWriter) {
 	queued := 0
-	bulk := dq.db.Bulk()
 
 	t := time.NewTimer(*flushTime)
 	defer t.Stop()
@@ -167,11 +129,16 @@ func dbWriteLoop(dq *dbWriter) {
 	defer liveTracker.Stop()
 	liveOps := 0
 
+	if err := dq.db.BeginTransaction(); err != nil {
+		log.Fatalf("Error beginning transaction on %v: %v", dq.dbname, err)
+	}
+
 	for {
 		select {
 		case <-dq.quit:
-			bulk.Close()
-			bulk.Commit()
+			if err := dq.db.Commit(); err != nil {
+				log.Printf("Error committing %v: %v", dq.dbname, err)
+			}
 			closeDBConn(dq.db)
 			dbRemoveConn(dq.dbname)
 			log.Printf("Closed %v", dq.dbname)
@@ -186,27 +153,27 @@ func dbWriteLoop(dq *dbWriter) {
 			liveOps++
 			switch qi.op {
 			case opStoreItem:
-				bulk.Set(couchstore.NewDocInfo(qi.k,
-					couchstore.DocIsCompressed),
-					couchstore.NewDocument(qi.k, qi.data))
+				if err := dq.db.Set([]byte(qi.k), qi.data); err != nil {
+					log.Printf("Error queueing %v: %v", qi, err)
+				}
 				queued++
 			case opDeleteItem:
+				dq.db.Delete([]byte(qi.k))
 				queued++
-				bulk.Delete(couchstore.NewDocInfo(qi.k, 0))
-			case opCompact:
-				var err error
-				bulk, err = dbCompact(dq, bulk, queued, qi)
-				qi.cherr <- err
-				queued = 0
 			default:
 				log.Panicf("Unhandled case: %v", qi.op)
 			}
 			if queued >= *maxOpQueue {
 				start := time.Now()
-				bulk.Commit()
+				if err := dq.db.Commit(); err != nil {
+					log.Printf("Error committing: %v", err)
+				}
 				if *verbose {
 					log.Printf("Flush of %d items took %v",
 						queued, time.Since(start))
+				}
+				if err := dq.db.BeginTransaction(); err != nil {
+					log.Printf("Error beginning new transaction: %v", err)
 				}
 				queued = 0
 				t.Reset(*flushTime)
@@ -214,10 +181,15 @@ func dbWriteLoop(dq *dbWriter) {
 		case <-t.C:
 			if queued > 0 {
 				start := time.Now()
-				bulk.Commit()
+				if err := dq.db.Commit(); err != nil {
+					log.Printf("Error committing: %v", err)
+				}
 				if *verbose {
 					log.Printf("Flush of %d items from timer took %v",
 						queued, time.Since(start))
+				}
+				if err := dq.db.BeginTransaction(); err != nil {
+					log.Printf("Error beginning new transaction: %v", err)
 				}
 				queued = 0
 			}
@@ -273,26 +245,6 @@ func dbstore(dbname string, k string, body []byte) error {
 	return nil
 }
 
-func dbcompact(dbname string) error {
-	writer, opened, err := getOrCreateDB(dbname)
-	if err != nil {
-		return err
-	}
-	if opened {
-		log.Printf("Requesting post-compaction close of %v", dbname)
-		defer writer.Close()
-	}
-
-	cherr := make(chan error)
-	defer close(cherr)
-	writer.ch <- dbqitem{dbname: dbname,
-		op:    opCompact,
-		cherr: cherr,
-	}
-
-	return <-cherr
-}
-
 func dbGetDoc(dbname, id string) ([]byte, error) {
 	db, err := dbopen(dbname)
 	if err != nil {
@@ -301,14 +253,14 @@ func dbGetDoc(dbname, id string) ([]byte, error) {
 	}
 	defer closeDBConn(db)
 
-	doc, _, err := db.Get(id)
+	doc, err := db.Get(nil, []byte(id))
 	if err != nil {
 		return nil, err
 	}
-	return doc.Value(), err
+	return doc, err
 }
 
-func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
+func dbwalk(dbname, from, to string, f func(k, v []byte) error) error {
 	db, err := dbopen(dbname)
 	if err != nil {
 		log.Printf("Error opening db: %v - %v", dbname, err)
@@ -316,31 +268,31 @@ func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
 	}
 	defer closeDBConn(db)
 
-	return db.WalkDocs(from, func(d *couchstore.Couchstore,
-		di *couchstore.DocInfo, doc *couchstore.Document) error {
-		if to != "" && di.ID() >= to {
-			return couchstore.StopIteration
-		}
-
-		return f(di.ID(), doc.Value())
-	})
-}
-
-func dbwalkKeys(dbname, from, to string, f func(k string) error) error {
-	db, err := dbopen(dbname)
+	e, _, err := db.Seek([]byte(from))
 	if err != nil {
-		log.Printf("Error opening db: %v - %v", dbname, err)
 		return err
 	}
-	defer closeDBConn(db)
 
-	return db.Walk(from, func(d *couchstore.Couchstore,
-		di *couchstore.DocInfo) error {
-		if to != "" && di.ID() >= to {
-			return couchstore.StopIteration
+	for {
+		key, value, err := e.Next()
+		switch err {
+		case nil:
+		case io.EOF:
+			return nil
+		default:
+			return err
 		}
 
-		return f(di.ID())
+		err = f(key, value)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func dbwalkKeys(dbname, from, to string, f func(string) error) error {
+	return dbwalk(dbname, from, to, func(k, v []byte) error {
+		return f(string(k))
 	})
 }
 

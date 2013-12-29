@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/gojson"
 )
@@ -244,8 +243,6 @@ func deleteBulk(args []string, w http.ResponseWriter, req *http.Request) {
 
 	req.ParseForm()
 
-	compactAfter := strings.ToLower(req.FormValue("compact"))
-
 	from, err := cleanupRangeParam(req.FormValue("from"), "")
 	if err != nil {
 		emitError(400, w, "Bad from value", err.Error())
@@ -263,29 +260,27 @@ func deleteBulk(args []string, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	bulk := db.Bulk()
+	err = db.BeginTransaction()
+	if err != nil {
+		emitError(500, w, "Error beginning transaction", err.Error())
+		return
+	}
+
 	deleteCount := 0
 	commitThreshold := 10000
 
 	err = dbwalkKeys(args[0], from, to, func(k string) error {
-
-		bulk.Delete(couchstore.NewDocInfo(k, 0))
+		db.Delete([]byte(k))
 		deleteCount++
 		if deleteCount >= commitThreshold {
-			bulk.Commit()
+			db.Commit()
 			deleteCount = 0
 		}
 		return err
 	})
 
 	if deleteCount > 0 {
-		bulk.Commit()
-	}
-
-	bulk.Close()
-
-	if compactAfter == "true" {
-		err = dbcompact(args[0])
+		db.Commit()
 	}
 
 	w.WriteHeader(201)
@@ -301,12 +296,7 @@ func deleteDB(parts []string, w http.ResponseWriter, req *http.Request) {
 }
 
 func compact(parts []string, w http.ResponseWriter, req *http.Request) {
-	err := dbcompact(parts[0])
-	if err == nil {
-		mustEncode(200, w, map[string]interface{}{"ok": true})
-	} else {
-		emitError(500, w, "Error compacting DB", err.Error())
-	}
+	mustEncode(200, w, map[string]interface{}{"ok": true})
 }
 
 func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
@@ -348,7 +338,7 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 	seenOne := false
 
 	walked := 0
-	err = dbwalk(args[0], from, to, func(k string, v []byte) error {
+	err = dbwalk(args[0], from, to, func(k, v []byte) error {
 		if walked > limit {
 			return io.EOF
 		}
@@ -401,7 +391,7 @@ func dumpDocs(args []string, w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(200)
 
 	walked := 0
-	err = dbwalk(args[0], from, to, func(k string, v []byte) error {
+	err = dbwalk(args[0], from, to, func(k, v []byte) error {
 		if walked > limit {
 			return io.EOF
 		}
@@ -433,18 +423,13 @@ func dbInfo(args []string, w http.ResponseWriter, req *http.Request) {
 	}
 	defer closeDBConn(db)
 
-	inf, err := db.Info()
-	if err == nil {
-		mustEncode(200, w, map[string]interface{}{
-			"last_seq":      inf.LastSeq,
-			"doc_count":     inf.DocCount,
-			"deleted_count": inf.DeletedCount,
-			"space_used":    inf.SpaceUsed,
-			"header_pos":    inf.HeaderPosition,
-		})
-	} else {
+	sz, err := db.Size()
+	if err != nil {
 		emitError(500, w, "Error getting db info", err.Error())
 	}
+	mustEncode(200, w, map[string]interface{}{
+		"size": sz,
+	})
 }
 
 // TODO:

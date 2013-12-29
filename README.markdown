@@ -11,8 +11,7 @@ Detailed docs are in [the wiki][wiki].
 
 ## Prereqs:
 
-To build the software, you need the [couchstore][couchstore] library
-installed and a [go][go] runtime.
+To build the software, you need the latest version of [go][go].
 
 ## Installation
 
@@ -39,5 +38,4 @@ matured a lot since then, but the core concepts haven't changed.
 [blog]: http://dustin.github.com/2012/09/09/seriesly.html
 [youtube]: http://youtu.be/8b-8NTCyFQQ
 [wiki]: https://github.com/dustin/seriesly/wiki
-[couchstore]: https://github.com/couchbase/couchstore
 [go]: http://golang.org/

@@ -1,13 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math"
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/dustin/go-couchstore"
 )
 
 var testInput = []interface{}{}
@@ -40,11 +39,11 @@ func streamCollection(s []interface{}) chan ptrval {
 		for _, r := range s {
 			t = t.Add(time.Second)
 			ts := t.Format(time.RFC3339Nano)
-			ch <- ptrval{couchstore.NewDocInfo(ts, 0), r, true}
+			ch <- ptrval{[]byte(ts), r, true}
 		}
 		t = t.Add(time.Second)
 		ts := t.Format(time.RFC3339Nano)
-		ch <- ptrval{couchstore.NewDocInfo(ts, 0), nextValue, false}
+		ch <- ptrval{[]byte(ts), nextValue, false}
 	}()
 	return ch
 }
@@ -76,13 +75,11 @@ func TestPairRateConversion(t *testing.T) {
 
 	tm := time.Now().UTC()
 	val1 := "20"
-	ch <- ptrval{couchstore.NewDocInfo(tm.Format(time.RFC3339Nano), 0),
-		val1, true}
+	ch <- ptrval{[]byte(tm.Format(time.RFC3339Nano)), val1, true}
 
 	tm = tm.Add(5 * time.Second)
 	val2 := "25"
-	ch <- ptrval{couchstore.NewDocInfo(tm.Format(time.RFC3339Nano), 0),
-		val2, false}
+	ch <- ptrval{[]byte(tm.Format(time.RFC3339Nano)), val2, false}
 
 	close(ch)
 	exp := 1.0
@@ -241,10 +238,9 @@ func TestNilReducers(t *testing.T) {
 
 func TestPointers(t *testing.T) {
 	docID := "2013-02-22T16:29:19.750264Z"
-	di := couchstore.NewDocInfo(docID, 0)
 	tests := []struct {
 		pointer string
-		exp     interface{}
+		exp     string
 	}{
 		{"/kind", "Listing"},
 		{"_id", docID},
@@ -253,10 +249,10 @@ func TestPointers(t *testing.T) {
 	for _, test := range tests {
 		chans := make([]chan ptrval, 0, 1)
 		chans = append(chans, make(chan ptrval))
-		go processDoc(di, chans, bigInput, []string{test.pointer}, []string{}, []string{}, true)
+		go processDoc([]byte(docID), chans, bigInput, []string{test.pointer}, []string{}, []string{}, true)
 		got := <-chans[0]
-		if test.exp != got.val {
-			t.Errorf("Expected %v for %v, got %v",
+		if test.exp != fmt.Sprintf("%s", got.val) {
+			t.Errorf("Expected %q for %v, got %q",
 				test.exp, test.pointer, got.val)
 		}
 	}
