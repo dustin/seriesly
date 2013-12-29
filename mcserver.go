@@ -17,11 +17,11 @@ const (
 	SELECT_BUCKET = gomemcached.CommandCode(0x89)
 )
 
-type MCSession struct {
+type mcSession struct {
 	dbname string
 }
 
-func (sess *MCSession) HandleMessage(
+func (sess *mcSession) HandleMessage(
 	w io.Writer, req *gomemcached.MCRequest) *gomemcached.MCResponse {
 
 	switch req.Opcode {
@@ -68,7 +68,7 @@ func waitForMCConnections(ls net.Listener) {
 		s, e := ls.Accept()
 		if e == nil {
 			log.Printf("Got a connection from %s", s.RemoteAddr())
-			go memcached.HandleIO(s, &MCSession{})
+			go memcached.HandleIO(s, &mcSession{})
 		} else {
 			log.Printf("Error accepting from %s", ls)
 		}

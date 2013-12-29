@@ -15,9 +15,9 @@ import (
 type dbOperation uint8
 
 const (
-	db_store_item = dbOperation(iota)
-	db_delete_item
-	db_compact
+	opStoreItem = dbOperation(iota)
+	opDeleteItem
+	opCompact
 )
 
 type dbqitem struct {
@@ -183,15 +183,15 @@ func dbWriteLoop(dq *dbWriter) {
 		case qi := <-dq.ch:
 			liveOps++
 			switch qi.op {
-			case db_store_item:
+			case opStoreItem:
 				bulk.Set(couchstore.NewDocInfo(qi.k,
 					couchstore.DocIsCompressed),
 					couchstore.NewDocument(qi.k, qi.data))
 				queued++
-			case db_delete_item:
+			case opDeleteItem:
 				queued++
 				bulk.Delete(couchstore.NewDocInfo(qi.k, 0))
-			case db_compact:
+			case opCompact:
 				var err error
 				bulk, err = dbCompact(dq, bulk, queued, qi)
 				qi.cherr <- err
@@ -266,7 +266,7 @@ func dbstore(dbname string, k string, body []byte) error {
 		return err
 	}
 
-	writer.ch <- dbqitem{dbname, k, body, db_store_item, nil}
+	writer.ch <- dbqitem{dbname, k, body, opStoreItem, nil}
 
 	return nil
 }
@@ -284,7 +284,7 @@ func dbcompact(dbname string) error {
 	cherr := make(chan error)
 	defer close(cherr)
 	writer.ch <- dbqitem{dbname: dbname,
-		op:    db_compact,
+		op:    opCompact,
 		cherr: cherr,
 	}
 

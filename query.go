@@ -22,7 +22,7 @@ type ptrval struct {
 	included bool
 }
 
-type Reducer func(input chan ptrval) interface{}
+type reducer func(input chan ptrval) interface{}
 
 type processOut struct {
 	cacheKey    string
@@ -408,7 +408,7 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 	return ch
 }
 
-var reducers = map[string]Reducer{
+var reducers = map[string]reducer{
 	"identity": func(input chan ptrval) interface{} {
 		rv := []interface{}{}
 		for s := range input {

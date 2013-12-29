@@ -240,14 +240,14 @@ func TestNilReducers(t *testing.T) {
 }
 
 func TestPointers(t *testing.T) {
-	docId := "2013-02-22T16:29:19.750264Z"
-	di := couchstore.NewDocInfo(docId, 0)
+	docID := "2013-02-22T16:29:19.750264Z"
+	di := couchstore.NewDocInfo(docID, 0)
 	tests := []struct {
 		pointer string
 		exp     interface{}
 	}{
 		{"/kind", "Listing"},
-		{"_id", docId},
+		{"_id", docID},
 	}
 
 	for _, test := range tests {
