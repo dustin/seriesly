@@ -1,4 +1,5 @@
 #*
+*.gz
 *~
 /db/
 /seriesly

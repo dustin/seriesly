@@ -83,7 +83,7 @@ func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
 	for db := range ch {
 		start := time.Now()
 		vlog("Dumping %v", db)
-		u.Path = "/" + db + "/_all"
+		u.Path = "/" + db + "/_dump"
 		n, err := dumpOne(db, u.String())
 		maybeFatal(err, "Error dumping %v: %v", u.String(), err)
 
