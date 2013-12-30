@@ -366,6 +366,55 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 	})
 }
 
+func dumpDocs(args []string, w http.ResponseWriter, req *http.Request) {
+	// Parse the params
+
+	req.ParseForm()
+
+	from, err := cleanupRangeParam(req.FormValue("from"), "")
+	if err != nil {
+		emitError(400, w, "Bad from value", err.Error())
+		return
+	}
+	to, err := cleanupRangeParam(req.FormValue("to"), "")
+	if err != nil {
+		emitError(400, w, "Bad to value", err.Error())
+		return
+	}
+
+	limit, err := strconv.Atoi(req.FormValue("limit"))
+	if err != nil {
+		limit = 2000000000
+	}
+
+	output := io.Writer(w)
+
+	if canGzip(req) {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		output = gz
+	} else {
+		output = w
+	}
+	w.WriteHeader(200)
+
+	walked := 0
+	err = dbwalk(args[0], from, to, func(k string, v []byte) error {
+		if walked > limit {
+			return io.EOF
+		}
+		walked++
+		_, err := fmt.Fprintf(output, `{"%s": `, k)
+		if err != nil {
+			return err
+		}
+		_, err = output.Write(v)
+		output.Write([]byte{'}', '\n'})
+		return err
+	})
+}
+
 func getDocument(parts []string, w http.ResponseWriter, req *http.Request) {
 	d, err := dbGetDoc(parts[0], parts[1])
 	if err == nil {

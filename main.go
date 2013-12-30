@@ -81,6 +81,8 @@ var routingTable = []routingEntry{
 		deleteBulk, *queryTimeout},
 	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_all"),
 		allDocs, *queryTimeout},
+	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_dump"),
+		dumpDocs, *queryTimeout},
 	routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/_compact"),
 		compact, time.Second * 30},
 	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
