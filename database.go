@@ -120,78 +120,77 @@ func dblist(root string) []string {
 	return rv
 }
 
-func dbWriteLoop(dq *dbWriter) {
-	queued := 0
+func storeItems(dq *dbWriter, queued []dbqitem) error {
+	start := time.Now()
 
+	if err := dq.db.BeginTransaction(); err != nil {
+		return err
+	}
+
+	for _, qi := range queued {
+		switch qi.op {
+		case opStoreItem:
+			if err := dq.db.Set([]byte(qi.k), qi.data); err != nil {
+				return err
+			}
+		case opDeleteItem:
+			if err := dq.db.Delete([]byte(qi.k)); err != nil {
+				return err
+			}
+		default:
+			log.Panicf("Unhandled op type: %#v", qi)
+		}
+	}
+
+	if err := dq.db.Commit(); err != nil {
+		return err
+	}
+
+	if *verbose {
+		log.Printf("Flush of %d items took %v",
+			len(queued), time.Since(start))
+	}
+	return nil
+}
+
+func dbWriteLoop(dq *dbWriter) {
 	t := time.NewTimer(*flushTime)
 	defer t.Stop()
 	liveTracker := time.NewTicker(*liveTime)
 	defer liveTracker.Stop()
 	liveOps := 0
 
-	if err := dq.db.BeginTransaction(); err != nil {
-		log.Fatalf("Error beginning transaction on %v: %v", dq.dbname, err)
-	}
+	queued := []dbqitem{}
 
 	for {
 		select {
 		case <-dq.quit:
-			if err := dq.db.Commit(); err != nil {
-				log.Printf("Error committing %v: %v", dq.dbname, err)
-			}
 			closeDBConn(dq.db)
 			dbRemoveConn(dq.dbname)
 			log.Printf("Closed %v", dq.dbname)
 			return
 		case <-liveTracker.C:
-			if queued == 0 && liveOps == 0 {
+			if len(queued) == 0 && liveOps == 0 {
 				log.Printf("Closing idle DB: %v", dq.dbname)
 				close(dq.quit)
 			}
 			liveOps = 0
 		case qi := <-dq.ch:
 			liveOps++
-			switch qi.op {
-			case opStoreItem:
-				if err := dq.db.Set([]byte(qi.k), qi.data); err != nil {
-					log.Printf("Error queueing %v: %v", qi, err)
+			queued = append(queued, qi)
+			if len(queued) >= *maxOpQueue {
+				if err := storeItems(dq, queued); err != nil {
+					log.Fatalf("Error storing items: %v", err)
 				}
-				queued++
-			case opDeleteItem:
-				dq.db.Delete([]byte(qi.k))
-				queued++
-			default:
-				log.Panicf("Unhandled case: %v", qi.op)
-			}
-			if queued >= *maxOpQueue {
-				start := time.Now()
-				if err := dq.db.Commit(); err != nil {
-					log.Printf("Error committing: %v", err)
-				}
-				if *verbose {
-					log.Printf("Flush of %d items took %v",
-						queued, time.Since(start))
-				}
-				if err := dq.db.BeginTransaction(); err != nil {
-					log.Printf("Error beginning new transaction: %v", err)
-				}
-				queued = 0
+				queued = queued[:0]
 				t.Reset(*flushTime)
 			}
 		case <-t.C:
-			if queued > 0 {
-				start := time.Now()
-				if err := dq.db.Commit(); err != nil {
-					log.Printf("Error committing: %v", err)
+			if len(queued) > 0 {
+				if err := storeItems(dq, queued); err != nil {
+					log.Fatalf("Error storing items: %v", err)
 				}
-				if *verbose {
-					log.Printf("Flush of %d items from timer took %v",
-						queued, time.Since(start))
-				}
-				if err := dq.db.BeginTransaction(); err != nil {
-					log.Printf("Error beginning new transaction: %v", err)
-				}
-				queued = 0
+				queued = queued[:0]
 			}
 			t.Reset(*flushTime)
 		}
