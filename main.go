@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"time"
 
 	"github.com/dustin/gojson"
@@ -57,47 +58,54 @@ const dbMatch = "[-%+()$_a-zA-Z0-9]+"
 
 var defaultDeadline = time.Millisecond * 50
 
-var routingTable = []routingEntry{
-	routingEntry{"GET", regexp.MustCompile("^/$"),
-		serverInfo, defaultDeadline},
-	routingEntry{"GET", regexp.MustCompile("^/_static/(.*)"),
-		staticHandler, defaultDeadline},
-	routingEntry{"GET", regexp.MustCompile("^/_debug/open$"),
-		debugListOpenDBs, defaultDeadline},
-	// Database stuff
-	routingEntry{"GET", regexp.MustCompile("^/_all_dbs$"),
-		listDatabases, defaultDeadline},
-	routingEntry{"GET", regexp.MustCompile("^/_(.*)"),
-		reservedHandler, defaultDeadline},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
-		dbInfo, defaultDeadline},
-	routingEntry{"HEAD", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
-		checkDB, defaultDeadline},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_changes$"),
-		dbChanges, defaultDeadline},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_query$"),
-		query, *queryTimeout},
-	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/_bulk$"),
-		deleteBulk, *queryTimeout},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_all"),
-		allDocs, *queryTimeout},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_dump"),
-		dumpDocs, *queryTimeout},
-	routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/_compact"),
-		compact, time.Second * 30},
-	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
-		createDB, defaultDeadline},
-	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
-		deleteDB, defaultDeadline},
-	routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
-		newDocument, defaultDeadline},
-	// Document stuff
-	routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
-		putDocument, defaultDeadline},
-	routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
-		getDocument, defaultDeadline},
-	routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
-		rmDocument, defaultDeadline},
+var routingTable []routingEntry
+
+func init() {
+	routingTable = []routingEntry{
+		routingEntry{"GET", regexp.MustCompile("^/$"),
+			serverInfo, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/_static/(.*)"),
+			staticHandler, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/_debug/open$"),
+			debugListOpenDBs, defaultDeadline},
+		// Database stuff
+		routingEntry{"GET", regexp.MustCompile("^/_all_dbs$"),
+			listDatabases, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/_(.*)"),
+			reservedHandler, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+			dbInfo, defaultDeadline},
+		routingEntry{"HEAD", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+			checkDB, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_changes$"),
+			dbChanges, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_query$"),
+			query, *queryTimeout},
+		routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/_bulk$"),
+			deleteBulk, *queryTimeout},
+		routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_all"),
+			allDocs, *queryTimeout},
+		routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/_dump"),
+			dumpDocs, *queryTimeout},
+		routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/_compact"),
+			compact, time.Second * 30},
+		routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+			createDB, defaultDeadline},
+		routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+			deleteDB, defaultDeadline},
+		routingEntry{"POST", regexp.MustCompile("^/(" + dbMatch + ")/?$"),
+			newDocument, defaultDeadline},
+		// Document stuff
+		routingEntry{"PUT", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
+			putDocument, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
+			getDocument, defaultDeadline},
+		routingEntry{"DELETE", regexp.MustCompile("^/(" + dbMatch + ")/([^/]+)$"),
+			rmDocument, defaultDeadline},
+		// Pre-flight goodness
+		routingEntry{"OPTIONS", regexp.MustCompile(".*"),
+			handleOptions, defaultDeadline},
+	}
 }
 
 func mustEncode(status int, w http.ResponseWriter, ob interface{}) {
@@ -131,11 +139,21 @@ func reservedHandler(parts []string, w http.ResponseWriter, req *http.Request) {
 }
 
 func defaultHandler(parts []string, w http.ResponseWriter, req *http.Request) {
-	emitError(400,
-
-		w, "no_handler",
+	emitError(400, w, "no_handler",
 		fmt.Sprintf("Can't handle %v to %v\n", req.Method, req.URL.Path))
 
+}
+
+func handleOptions(parts []string, w http.ResponseWriter, req *http.Request) {
+	methods := []string{}
+	for _, r := range routingTable {
+		if len(r.Path.FindAllStringSubmatch(req.URL.Path, 1)) > 0 {
+			methods = append(methods, r.Method)
+		}
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", strings.Join(methods, ", "))
+	w.WriteHeader(204)
 }
 
 func findHandler(method, path string) (routingEntry, []string) {
