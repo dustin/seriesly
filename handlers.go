@@ -217,6 +217,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				if !started {
 					w.WriteHeader(500)
+					w.Header().Set("Content-Type", "text/plain")
 					fmt.Fprintf(output, "Error beginning traversal: %v", err)
 				}
 				log.Printf("Walk completed with err: %v", err)
