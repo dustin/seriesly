@@ -20,6 +20,8 @@ const (
 	opCompact
 )
 
+const dbExt = ".couch"
+
 type dbqitem struct {
 	dbname string
 	k      string
@@ -51,7 +53,7 @@ var dbLock = sync.Mutex{}
 var dbConns = map[string]*dbWriter{}
 
 func dbPath(n string) string {
-	return filepath.Join(*dbRoot, n) + ".couch"
+	return filepath.Join(*dbRoot, n) + dbExt
 }
 
 func dbBase(n string) string {
@@ -63,8 +65,8 @@ func dbBase(n string) string {
 			left++
 		}
 	}
-	if strings.HasSuffix(n, ".couch") {
-		right = len(n) - 6
+	if strings.HasSuffix(n, dbExt) {
+		right = len(n) - len(dbExt)
 	}
 	return n[left:right]
 }
@@ -107,7 +109,7 @@ func dblist(root string) []string {
 	rv := []string{}
 	filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 		if err == nil {
-			if !info.IsDir() && strings.HasSuffix(p, ".couch") {
+			if !info.IsDir() && strings.HasSuffix(p, dbExt) {
 				rv = append(rv, dbBase(p))
 			}
 		} else {
