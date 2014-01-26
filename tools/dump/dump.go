@@ -21,6 +21,7 @@ var (
 	concurrency = flag.Int("j", 2,
 		"number of concurrent dumps")
 	dbName = flag.String("db", "", "which db to dump (default: all)")
+	noop   = flag.Bool("n", false, "if true, don't actually write dumps")
 )
 
 func init() {
@@ -59,6 +60,9 @@ func compress(w io.Writer) io.WriteCloser {
 }
 
 func dumpOne(dbname, u string) (int64, error) {
+	if *noop {
+		return 0, nil
+	}
 	res, err := http.Get(u)
 	if err != nil {
 		return 0, err
@@ -90,8 +94,10 @@ func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
 		n, err := dumpOne(db, u.String())
 		maybeFatal(err, "Error dumping %v: %v", u.String(), err)
 
-		vlog("Dumped %v of %v in %v",
-			humanize.Bytes(uint64(n)), db, time.Since(start))
+		if !*noop {
+			vlog("Dumped %v of %v in %v",
+				humanize.Bytes(uint64(n)), db, time.Since(start))
+		}
 	}
 }
 
