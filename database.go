@@ -131,10 +131,16 @@ func storeItems(dq *dbWriter, queued []dbqitem) error {
 		switch qi.op {
 		case opStoreItem:
 			if err := dq.db.Set([]byte(qi.k), qi.data); err != nil {
+				if err2 := dq.db.Rollback(); err2 != nil && err == nil {
+					err = err2
+				}
 				return err
 			}
 		case opDeleteItem:
 			if err := dq.db.Delete([]byte(qi.k)); err != nil {
+				if err2 := dq.db.Rollback(); err2 != nil && err == nil {
+					err = err2
+				}
 				return err
 			}
 		default:
