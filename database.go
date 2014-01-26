@@ -297,13 +297,13 @@ func dbGetDoc(dbname, id string) ([]byte, error) {
 	db, err := dbopen(dbname)
 	if err != nil {
 		log.Printf("Error opening db: %v - %v", dbname, err)
-		return []byte{}, err
+		return nil, err
 	}
 	defer closeDBConn(db)
 
 	doc, _, err := db.Get(id)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	return doc.Value(), err
 }
