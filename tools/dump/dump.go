@@ -16,9 +16,12 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-var verbose = flag.Bool("v", false, "verbosity")
-var concurrency = flag.Int("j", 2,
-	"number of concurrent dumps")
+var (
+	verbose     = flag.Bool("v", false, "verbosity")
+	concurrency = flag.Int("j", 2,
+		"number of concurrent dumps")
+	dbName = flag.String("db", "", "which db to dump (default: all)")
+)
 
 func init() {
 	log.SetFlags(log.Lmicroseconds)
@@ -110,8 +113,12 @@ func main() {
 		go dump(wg, *u, ch)
 	}
 
-	for _, db := range listDatabases(*u) {
-		ch <- db
+	if *dbName == "" {
+		for _, db := range listDatabases(*u) {
+			ch <- db
+		}
+	} else {
+		ch <- *dbName
 	}
 	close(ch)
 
