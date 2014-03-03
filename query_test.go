@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dustin/go-couchstore"
+	"github.com/mschoch/gouchstore"
 )
 
 var testInput = []interface{}{}
@@ -40,11 +40,11 @@ func streamCollection(s []interface{}) chan ptrval {
 		for _, r := range s {
 			t = t.Add(time.Second)
 			ts := t.Format(time.RFC3339Nano)
-			ch <- ptrval{couchstore.NewDocInfo(ts, 0), r, true}
+			ch <- ptrval{gouchstore.NewDocumentInfo(ts), r, true}
 		}
 		t = t.Add(time.Second)
 		ts := t.Format(time.RFC3339Nano)
-		ch <- ptrval{couchstore.NewDocInfo(ts, 0), nextValue, false}
+		ch <- ptrval{gouchstore.NewDocumentInfo(ts), nextValue, false}
 	}()
 	return ch
 }
@@ -76,12 +76,12 @@ func TestPairRateConversion(t *testing.T) {
 
 	tm := time.Now().UTC()
 	val1 := "20"
-	ch <- ptrval{couchstore.NewDocInfo(tm.Format(time.RFC3339Nano), 0),
+	ch <- ptrval{gouchstore.NewDocumentInfo(tm.Format(time.RFC3339Nano)),
 		val1, true}
 
 	tm = tm.Add(5 * time.Second)
 	val2 := "25"
-	ch <- ptrval{couchstore.NewDocInfo(tm.Format(time.RFC3339Nano), 0),
+	ch <- ptrval{gouchstore.NewDocumentInfo(tm.Format(time.RFC3339Nano)),
 		val2, false}
 
 	close(ch)
@@ -241,7 +241,7 @@ func TestNilReducers(t *testing.T) {
 
 func TestPointers(t *testing.T) {
 	docID := "2013-02-22T16:29:19.750264Z"
-	di := couchstore.NewDocInfo(docID, 0)
+	di := gouchstore.NewDocumentInfo(docID)
 	tests := []struct {
 		pointer string
 		exp     interface{}

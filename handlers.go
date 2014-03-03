@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/gojson"
+	"github.com/mschoch/gouchstore"
 )
 
 func serverInfo(parts []string, w http.ResponseWriter, req *http.Request) {
@@ -269,7 +269,7 @@ func deleteBulk(args []string, w http.ResponseWriter, req *http.Request) {
 
 	err = dbwalkKeys(args[0], from, to, func(k string) error {
 
-		bulk.Delete(couchstore.NewDocInfo(k, 0))
+		bulk.Delete(gouchstore.NewDocumentInfo(k))
 		deleteCount++
 		if deleteCount >= commitThreshold {
 			bulk.Commit()
@@ -433,11 +433,11 @@ func dbInfo(args []string, w http.ResponseWriter, req *http.Request) {
 	}
 	defer closeDBConn(db)
 
-	inf, err := db.Info()
+	inf, err := db.DatabaseInfo()
 	if err == nil {
 		mustEncode(200, w, map[string]interface{}{
 			"last_seq":      inf.LastSeq,
-			"doc_count":     inf.DocCount,
+			"doc_count":     inf.DocumentCount,
 			"deleted_count": inf.DeletedCount,
 			"space_used":    inf.SpaceUsed,
 			"header_pos":    inf.HeaderPosition,

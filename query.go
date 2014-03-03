@@ -9,15 +9,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dustin/go-couchstore"
 	"github.com/dustin/go-jsonpointer"
 	"github.com/dustin/gojson"
+	"github.com/mschoch/gouchstore"
 )
 
 var errTimeout = errors.New("query timed out")
 
 type ptrval struct {
-	di       *couchstore.DocInfo
+	di       *gouchstore.DocumentInfo
 	val      interface{}
 	included bool
 }
@@ -40,8 +40,8 @@ type processIn struct {
 	cacheKey   string
 	dbname     string
 	key        int64
-	infos      []*couchstore.DocInfo
-	nextInfo   *couchstore.DocInfo
+	infos      []*gouchstore.DocumentInfo
+	nextInfo   *gouchstore.DocumentInfo
 	ptrs       []string
 	reds       []string
 	before     time.Time
@@ -83,7 +83,7 @@ func resolveFetch(j []byte, keys []string) map[string]interface{} {
 	return rv
 }
 
-func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
+func processDoc(di *gouchstore.DocumentInfo, chs []chan ptrval,
 	doc []byte, ptrs []string,
 	filters []string, filtervals []string,
 	included bool) {
@@ -130,7 +130,7 @@ func processDoc(di *couchstore.DocInfo, chs []chan ptrval,
 	for i, p := range ptrs {
 		val := fetched[p]
 		if p == "_id" {
-			val = di.ID()
+			val = di.ID
 		}
 		switch x := val.(type) {
 		case int, uint, int64, float64, uint64, bool:
@@ -174,10 +174,10 @@ func processDocs(pi *processIn) {
 	go func() {
 		defer closeAll(chans)
 
-		dodoc := func(di *couchstore.DocInfo, included bool) {
-			doc, err := db.GetFromDocInfo(di)
+		dodoc := func(di *gouchstore.DocumentInfo, included bool) {
+			doc, err := db.DocumentByDocumentInfo(di)
 			if err == nil {
-				processDoc(di, chans, doc.Value(), pi.ptrs,
+				processDoc(di, chans, doc.Body, pi.ptrs,
 					pi.filters, pi.filtervals, included)
 			} else {
 				for i := range pi.ptrs {
@@ -226,8 +226,8 @@ func docProcessor(ch <-chan *processIn) {
 	}
 }
 
-func fetchDocs(dbname string, key int64, infos []*couchstore.DocInfo,
-	nextInfo *couchstore.DocInfo, ptrs []string, reds []string,
+func fetchDocs(dbname string, key int64, infos []*gouchstore.DocumentInfo,
+	nextInfo *gouchstore.DocumentInfo, ptrs []string, reds []string,
 	filters []string, filtervals []string,
 	before time.Time, out chan<- *processOut) {
 
@@ -257,17 +257,13 @@ func runQuery(q *queryIn) {
 
 	chunk := int64(time.Duration(q.group) * time.Millisecond)
 
-	infos := []*couchstore.DocInfo{}
+	infos := []*gouchstore.DocumentInfo{}
 	g := int64(0)
 	nextg := ""
 
-	err = db.Walk(q.from, func(d *couchstore.Couchstore,
-		di *couchstore.DocInfo) error {
-		kstr := di.ID()
+	err = db.AllDocuments(q.from, q.to, func(db *gouchstore.Gouchstore, di *gouchstore.DocumentInfo, userContext interface{}) error {
+		kstr := di.ID
 		var err error
-		if q.to != "" && kstr >= q.to {
-			err = couchstore.StopIteration
-		}
 
 		atomic.AddInt32(&q.totalKeys, 1)
 
@@ -278,7 +274,7 @@ func runQuery(q *queryIn) {
 					q.ptrs, q.reds, q.filters, q.filtervals,
 					q.before, q.out)
 
-				infos = make([]*couchstore.DocInfo, 0, len(infos))
+				infos = make([]*gouchstore.DocumentInfo, 0, len(infos))
 			}
 
 			k := parseKey(kstr)
@@ -290,7 +286,7 @@ func runQuery(q *queryIn) {
 		infos = append(infos, di)
 
 		return err
-	})
+	}, nil)
 
 	if err == nil && len(infos) > 0 {
 		atomic.AddInt32(&q.started, 1)
@@ -374,7 +370,7 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 				case string:
 					x, err := strconv.ParseFloat(value, 64)
 					if err == nil {
-						prevts = parseKey(v.di.ID())
+						prevts = parseKey(v.di.ID)
 						preval = x
 						break FIND_USABLE
 					}
@@ -388,7 +384,7 @@ func convertTofloat64Rate(in chan ptrval) chan float64 {
 				case string:
 					x, err := strconv.ParseFloat(value, 64)
 					if err == nil {
-						thists := parseKey(v.di.ID())
+						thists := parseKey(v.di.ID)
 
 						val := ((x - preval) /
 							(float64(thists-prevts) / 1e9))

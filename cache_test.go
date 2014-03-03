@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dustin/go-couchstore"
+	"github.com/mschoch/gouchstore"
 )
 
 func benchCacheSize(b *testing.B, num int) {
@@ -17,8 +17,7 @@ func benchCacheSize(b *testing.B, num int) {
 
 	startTime := time.Now()
 	for i := 0; i < num; i++ {
-		di := couchstore.NewDocInfo(startTime.Format(time.RFC3339Nano),
-			0)
+		di := gouchstore.NewDocumentInfo(startTime.Format(time.RFC3339Nano))
 		p.infos = append(p.infos, di)
 	}
 

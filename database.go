@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dustin/go-couchstore"
+	"github.com/mschoch/gouchstore"
 )
 
 type dbOperation uint8
@@ -34,7 +34,7 @@ type dbWriter struct {
 	dbname string
 	ch     chan dbqitem
 	quit   chan bool
-	db     *couchstore.Couchstore
+	db     *gouchstore.Gouchstore
 }
 
 var errClosed = errors.New("closed")
@@ -71,9 +71,9 @@ func dbBase(n string) string {
 	return n[left:right]
 }
 
-func dbopen(name string) (*couchstore.Couchstore, error) {
+func dbopen(name string) (*gouchstore.Gouchstore, error) {
 	path := dbPath(name)
-	db, err := couchstore.Open(dbPath(name), false)
+	db, err := gouchstore.Open(dbPath(name), 0)
 	if err == nil {
 		recordDBConn(path, db)
 	}
@@ -81,7 +81,7 @@ func dbopen(name string) (*couchstore.Couchstore, error) {
 }
 
 func dbcreate(path string) error {
-	db, err := couchstore.Open(path, true)
+	db, err := gouchstore.Open(path, gouchstore.OPEN_CREATE)
 	if err != nil {
 		return err
 	}
@@ -120,8 +120,8 @@ func dblist(root string) []string {
 	return rv
 }
 
-func dbCompact(dq *dbWriter, bulk couchstore.BulkWriter, queued int,
-	qi dbqitem) (couchstore.BulkWriter, error) {
+func dbCompact(dq *dbWriter, bulk gouchstore.BulkWriter, queued int,
+	qi dbqitem) (gouchstore.BulkWriter, error) {
 	start := time.Now()
 	if queued > 0 {
 		bulk.Commit()
@@ -134,7 +134,7 @@ func dbCompact(dq *dbWriter, bulk couchstore.BulkWriter, queued int,
 	dbn := dbPath(dq.dbname)
 	queued = 0
 	start = time.Now()
-	err := dq.db.CompactTo(dbn + ".compact")
+	err := dq.db.Compact(dbn + ".compact")
 	if err != nil {
 		log.Printf("Error compacting: %v", err)
 		return dq.db.Bulk(), err
@@ -186,13 +186,12 @@ func dbWriteLoop(dq *dbWriter) {
 			liveOps++
 			switch qi.op {
 			case opStoreItem:
-				bulk.Set(couchstore.NewDocInfo(qi.k,
-					couchstore.DocIsCompressed),
-					couchstore.NewDocument(qi.k, qi.data))
+				bulk.Set(gouchstore.NewDocumentInfo(qi.k),
+					gouchstore.NewDocument(qi.k, qi.data))
 				queued++
 			case opDeleteItem:
 				queued++
-				bulk.Delete(couchstore.NewDocInfo(qi.k, 0))
+				bulk.Delete(gouchstore.NewDocumentInfo(qi.k))
 			case opCompact:
 				var err error
 				bulk, err = dbCompact(dq, bulk, queued, qi)
@@ -301,11 +300,11 @@ func dbGetDoc(dbname, id string) ([]byte, error) {
 	}
 	defer closeDBConn(db)
 
-	doc, _, err := db.Get(id)
+	doc, err := db.DocumentById(id)
 	if err != nil {
 		return nil, err
 	}
-	return doc.Value(), err
+	return doc.Body, err
 }
 
 func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
@@ -316,13 +315,9 @@ func dbwalk(dbname, from, to string, f func(k string, v []byte) error) error {
 	}
 	defer closeDBConn(db)
 
-	return db.WalkDocs(from, func(d *couchstore.Couchstore,
-		di *couchstore.DocInfo, doc *couchstore.Document) error {
-		if to != "" && di.ID() >= to {
-			return couchstore.StopIteration
-		}
-
-		return f(di.ID(), doc.Value())
+	return db.WalkDocs(from, to, func(d *gouchstore.Gouchstore,
+		di *gouchstore.DocumentInfo, doc *gouchstore.Document) error {
+		return f(di.ID, doc.Body)
 	})
 }
 
@@ -334,14 +329,9 @@ func dbwalkKeys(dbname, from, to string, f func(k string) error) error {
 	}
 	defer closeDBConn(db)
 
-	return db.Walk(from, func(d *couchstore.Couchstore,
-		di *couchstore.DocInfo) error {
-		if to != "" && di.ID() >= to {
-			return couchstore.StopIteration
-		}
-
-		return f(di.ID())
-	})
+	return db.AllDocuments(from, to, func(db *gouchstore.Gouchstore, documentInfo *gouchstore.DocumentInfo, userContext interface{}) error {
+		return f(documentInfo.ID)
+	}, nil)
 }
 
 func parseKey(s string) int64 {
