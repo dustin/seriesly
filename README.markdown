@@ -11,8 +11,8 @@ Detailed docs are in [the wiki][wiki].
 
 ## Prereqs:
 
-To build the software, you need the [couchstore][couchstore] library
-installed and a [go][go] runtime.
+To build the software, you need a [go][go] runtime installed.
+Preferably a recent one.
 
 ## Installation
 
