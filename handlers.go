@@ -212,7 +212,6 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 				output = ioutil.Discard
 				q.before = time.Time{}
 			}
-			going = (q.started-finished > 0) || !walkComplete
 		case err = <-q.cherr:
 			if err != nil {
 				if !started {
@@ -225,6 +224,7 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 			}
 			walkComplete = true
 		}
+		going = (q.started-finished > 0) || !walkComplete
 	}
 
 	if started {
