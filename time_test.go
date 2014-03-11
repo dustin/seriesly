@@ -97,6 +97,13 @@ func TestCanonicalParser(t *testing.T) {
 	}
 }
 
+func TestUnparseable(t *testing.T) {
+	tm, err := parseTime("an hour ago")
+	if err != errUnparseableTimestamp {
+		t.Fatalf("Expected unparseable, got %v/%v", tm, err)
+	}
+}
+
 func benchTimeParsing(b *testing.B, input string) {
 	for i := 0; i < b.N; i++ {
 		_, err := parseTime(input)
