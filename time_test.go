@@ -97,6 +97,26 @@ func TestCanonicalParser(t *testing.T) {
 	}
 }
 
+func TestCanonicalParsingErrors(t *testing.T) {
+	tests := []string{
+		"ZZZZZZZZZZZZZZZZZZZZ",
+		"ZZZZ-ZZ-ZZTZZ:ZZ:ZZZ",
+		"2014-ZZ-ZZTZZ:ZZ:ZZZ",
+		"2014-03-ZZTZZ:ZZ:ZZZ",
+		"2014-03-14TZZ:ZZ:ZZZ",
+		"2014-03-14T15:ZZ:ZZZ",
+		"2014-03-14T15:09:ZZZ",
+		"2014-03-14T15:09:26.S35897Z",
+	}
+
+	for _, test := range tests {
+		tm, err := parseCanonicalTime(test)
+		if err == nil {
+			t.Errorf("No error on %q, got %v", test, tm)
+		}
+	}
+}
+
 func TestUnparseable(t *testing.T) {
 	tm, err := parseTime("an hour ago")
 	if err != errUnparseableTimestamp {
