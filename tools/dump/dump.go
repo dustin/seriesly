@@ -11,9 +11,11 @@ import (
 	"net/url"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/dustin/httputil"
 )
 
 var (
@@ -23,6 +25,8 @@ var (
 	dbName = flag.String("db", "", "which db to dump (default: all)")
 	noop   = flag.Bool("n", false, "if true, don't actually write dumps")
 )
+
+const sigInfo = syscall.Signal(29)
 
 func init() {
 	log.SetFlags(log.Lmicroseconds)
@@ -103,6 +107,8 @@ func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
 
 func main() {
 	flag.Parse()
+
+	httputil.InitHTTPTracker(false)
 
 	if flag.NArg() == 0 {
 		log.Fatalf("Seriesly URL required")
