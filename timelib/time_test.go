@@ -1,4 +1,4 @@
-package main
+package timelib
 
 import (
 	"log"
@@ -47,7 +47,7 @@ func TestTimeParsing(t *testing.T) {
 	}
 
 	for _, x := range tests {
-		tm, err := parseTime(x.input)
+		tm, err := ParseTime(x.input)
 		if err != nil {
 			t.Errorf("Error on %v - %v", x.input, err)
 			t.Fail()
@@ -80,7 +80,7 @@ func TestCanonicalParser(t *testing.T) {
 	}
 
 	for _, x := range tests {
-		tm, err := parseCanonicalTime(x.input)
+		tm, err := ParseCanonicalTime(x.input)
 		if err != nil {
 			t.Errorf("Error on %v - %v", x.input, err)
 			t.Fail()
@@ -110,7 +110,7 @@ func TestCanonicalParsingErrors(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tm, err := parseCanonicalTime(test)
+		tm, err := ParseCanonicalTime(test)
 		if err == nil {
 			t.Errorf("No error on %q, got %v", test, tm)
 		}
@@ -118,7 +118,7 @@ func TestCanonicalParsingErrors(t *testing.T) {
 }
 
 func TestUnparseable(t *testing.T) {
-	tm, err := parseTime("an hour ago")
+	tm, err := ParseTime("an hour ago")
 	if err != errUnparseableTimestamp {
 		t.Fatalf("Expected unparseable, got %v/%v", tm, err)
 	}
@@ -126,7 +126,7 @@ func TestUnparseable(t *testing.T) {
 
 func benchTimeParsing(b *testing.B, input string) {
 	for i := 0; i < b.N; i++ {
-		_, err := parseTime(input)
+		_, err := ParseTime(input)
 		if err != nil {
 			b.Fatalf("Error on %v - %v", input, err)
 		}
@@ -136,7 +136,7 @@ func benchTimeParsing(b *testing.B, input string) {
 func BenchmarkParseTimeCanonicalDirect(b *testing.B) {
 	input := "2012-08-28T21:24:35.37465188Z"
 	for i := 0; i < b.N; i++ {
-		_, err := parseCanonicalTime(input)
+		_, err := ParseCanonicalTime(input)
 		if err != nil {
 			b.Fatalf("Error on %v - %v", input, err)
 		}

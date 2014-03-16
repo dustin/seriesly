@@ -1,4 +1,5 @@
-package main
+// Package timelib provides time parsing functions.
+package timelib
 
 import (
 	"errors"
@@ -38,8 +39,11 @@ var powTable = []int{
 	1,
 }
 
-// Hand crafted this parser since it's a really common path.
-func parseCanonicalTime(in string) (time.Time, error) {
+// ParseCanonicalTime parses the canonical seriesly time format.
+//
+// This is a hand crafted parser since it's a really common path and I
+// could make it faster this way.
+func ParseCanonicalTime(in string) (time.Time, error) {
 	if len(in) < 20 || in[len(in)-1] != 'Z' {
 		return time.Time{}, errUnparseableTimestamp
 	}
@@ -103,7 +107,8 @@ func parseCanonicalTime(in string) (time.Time, error) {
 		hour, minute, second, nsec, time.UTC), nil
 }
 
-func parseTime(in string) (time.Time, error) {
+// ParseTime parses any time format supported by seriesly quickly and easily.
+func ParseTime(in string) (time.Time, error) {
 	// First, try a few numerics
 	n, err := strconv.ParseInt(in, 10, 64)
 	if err == nil {
@@ -119,7 +124,7 @@ func parseTime(in string) (time.Time, error) {
 			return time.Unix(n, 0), nil
 		}
 	}
-	rv, err := parseCanonicalTime(in)
+	rv, err := ParseCanonicalTime(in)
 	if err == nil {
 		return rv, nil
 	}

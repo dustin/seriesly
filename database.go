@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dustin/seriesly/timelib"
 	"github.com/mschoch/gouchstore"
 )
 
@@ -335,7 +336,7 @@ func dbwalkKeys(dbname, from, to string, f func(k string) error) error {
 }
 
 func parseKey(s string) int64 {
-	t, err := parseCanonicalTime(s)
+	t, err := timelib.ParseCanonicalTime(s)
 	if err != nil {
 		return -1
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/gojson"
+	"github.com/dustin/seriesly/timelib"
 	"github.com/mschoch/gouchstore"
 )
 
@@ -62,7 +63,7 @@ func newDocument(args []string, w http.ResponseWriter, req *http.Request) {
 	if fk == "" {
 		k = time.Now().UTC().Format(time.RFC3339Nano)
 	} else {
-		t, err := parseTime(fk)
+		t, err := timelib.ParseTime(fk)
 		if err != nil {
 			emitError(400, w, "Bad time format", err.Error())
 			return
@@ -102,7 +103,7 @@ func cleanupRangeParam(in, def string) (string, error) {
 	if in == "" {
 		return def, nil
 	}
-	t, err := parseTime(in)
+	t, err := timelib.ParseTime(in)
 	if err != nil {
 		return in, err
 	}

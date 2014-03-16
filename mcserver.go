@@ -8,6 +8,7 @@ import (
 
 	"github.com/dustin/gomemcached"
 	"github.com/dustin/gomemcached/server"
+	"github.com/dustin/seriesly/timelib"
 )
 
 const (
@@ -34,7 +35,7 @@ func (sess *mcSession) HandleMessage(
 		if fk == "" {
 			k = time.Now().UTC().Format(time.RFC3339Nano)
 		} else {
-			t, err := parseTime(fk)
+			t, err := timelib.ParseTime(fk)
 			if err != nil {
 				return &gomemcached.MCResponse{
 					Status: gomemcached.EINVAL,
