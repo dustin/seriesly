@@ -10,12 +10,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/httputil"
+	"github.com/dustin/seriesly/timelib"
 )
 
 var (
@@ -24,6 +26,8 @@ var (
 		"number of concurrent dumps")
 	dbName = flag.String("db", "", "which db to dump (default: all)")
 	noop   = flag.Bool("n", false, "if true, don't actually write dumps")
+	from   = flag.String("from", "", "oldest key to dump")
+	to     = flag.String("to", "", "newest key to dump")
 )
 
 const sigInfo = syscall.Signal(29)
@@ -36,6 +40,14 @@ func maybeFatal(err error, fmt string, args ...interface{}) {
 	if err != nil {
 		log.Fatalf(fmt, args...)
 	}
+}
+
+func checkTime(which, ts string) string {
+	t, err := timelib.ParseTime(ts)
+	if err != nil {
+		log.Fatalf("Error parsing %q value: %v", which, err)
+	}
+	return strconv.FormatInt(t.UnixNano(), 10)
 }
 
 func listDatabases(u url.URL) []string {
@@ -95,6 +107,16 @@ func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
 		start := time.Now()
 		vlog("Dumping %v", db)
 		u.Path = "/" + db + "/_dump"
+		params := url.Values{}
+		if *from != "" {
+			params.Set("from", checkTime("from", *from))
+		}
+		if *to != "" {
+			params.Set("to", checkTime("to", *to))
+		}
+
+		u.RawQuery = params.Encode()
+
 		n, err := dumpOne(db, u.String())
 		maybeFatal(err, "Error dumping %v: %v", u.String(), err)
 
