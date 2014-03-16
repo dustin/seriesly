@@ -107,7 +107,26 @@ func ParseCanonicalTime(in string) (time.Time, error) {
 		hour, minute, second, nsec, time.UTC), nil
 }
 
-// ParseTime parses any time format supported by seriesly quickly and easily.
+// ParseTime parses any time format supported by seriesly quickly and
+// easily.
+//
+// The following timestamps are supported:
+//
+//    2012-08-28T21:24:35.37465188Z - RFC3339 (this is the canonical format)
+//    1346189075374651880 - nanoseconds since 1970-1-1
+//    1346189075374 - milliseconds since 1970-1-1, common in java
+//    1346189075 - seconds since 1970-1-1, common in unix
+//    2012-08-28T21:24:35Z - RFC3339
+//    Tue, 28 Aug 2012 21:24:35 +0000 - RFC1123 + numeric timezone
+//    Tue, 28 Aug 2012 21:24:35 UTC RFC1123
+//    Tue Aug 28 21:24:35 UTC 2012 - Unix date
+//    Tue Aug 28 21:24:35 2012 - ansi C timestamp
+//    Tue Aug 28 21:24:35 +0000 2012 - ruby datestamp
+//    2012-08-28T21:24 - parsed as 2012-08-28T21:24:00Z
+//    2012-08-28T21 - parsed as 2012-08-28T21:00:00Z
+//    2012-08-28 - parsed as 2012-08-28T00:00:00Z
+//    2012-08 - parsed as 2012-08-01T00:00:00Z
+//    2012 - parsed as 2012-01-01T00:00:00Z
 func ParseTime(in string) (time.Time, error) {
 	// First, try a few numerics
 	n, err := strconv.ParseInt(in, 10, 64)
