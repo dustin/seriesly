@@ -24,10 +24,11 @@ var (
 	verbose     = flag.Bool("v", false, "verbosity")
 	concurrency = flag.Int("j", 2,
 		"number of concurrent dumps")
-	dbName = flag.String("db", "", "which db to dump (default: all)")
-	noop   = flag.Bool("n", false, "if true, don't actually write dumps")
-	from   = flag.String("from", "", "oldest key to dump")
-	to     = flag.String("to", "", "newest key to dump")
+	dbName    = flag.String("db", "", "which db to dump (default: all)")
+	noop      = flag.Bool("n", false, "if true, don't actually write dumps")
+	from      = flag.String("from", "", "oldest key to dump")
+	to        = flag.String("to", "", "newest key to dump")
+	formatStr = flag.String("format", "%n.json.gz", "dump name format")
 )
 
 const sigInfo = syscall.Signal(29)
@@ -75,7 +76,7 @@ func compress(w io.Writer) io.WriteCloser {
 	return z
 }
 
-func dumpOne(dbname, u string) (int64, error) {
+func dumpOne(dbname, u string, t time.Time) (int64, error) {
 	if *noop {
 		return 0, nil
 	}
@@ -89,7 +90,8 @@ func dumpOne(dbname, u string) (int64, error) {
 		return 0, fmt.Errorf("HTTP Error: %v", res.Status)
 	}
 
-	outf, err := os.Create(dbname + ".json.gz")
+	fn := format(*formatStr, dbname, t)
+	outf, err := os.Create(fn)
 	if err != nil {
 		return 0, err
 	}
@@ -103,6 +105,7 @@ func dumpOne(dbname, u string) (int64, error) {
 func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
 	defer wg.Done()
 
+	t := time.Now()
 	for db := range ch {
 		start := time.Now()
 		vlog("Dumping %v", db)
@@ -117,7 +120,7 @@ func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
 
 		u.RawQuery = params.Encode()
 
-		n, err := dumpOne(db, u.String())
+		n, err := dumpOne(db, u.String(), t)
 		maybeFatal(err, "Error dumping %v: %v", u.String(), err)
 
 		if !*noop {
