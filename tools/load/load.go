@@ -52,18 +52,17 @@ func main() {
 		}
 		maybeFatal(err)
 
+		var latestKey string
 		for k, v := range kv {
 			body := []byte(*v)
 			sendOne(u, k, body)
+			latestKey = k
 		}
 
 		i++
 		select {
 		case <-t:
-			var k string
-			for k = range kv {
-			}
-			log.Printf("Processed %v items, latest was %v", i, k)
+			log.Printf("Processed %v items, latest was %v", i, latestKey)
 		default:
 		}
 	}
