@@ -5,12 +5,16 @@ import (
 )
 
 func TestKeyParsing(t *testing.T) {
-	input := "2012-08-26T20:46:01.911627314Z"
-	exp := int64(1346013961911627314)
+	tests := map[string]int64{
+		"2012-08-26T20:46:01.911627314Z": 1346013961911627314,
+		"82488858158":                    -1,
+	}
 
-	got := parseKey(input)
-	if got != exp {
-		t.Fatalf("Expected %v, got %v", exp, got)
+	for input, exp := range tests {
+		got := parseKey(input)
+		if got != exp {
+			t.Errorf("Expected %v, got %v", exp, got)
+		}
 	}
 }
 
