@@ -13,8 +13,7 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-var verbose = flag.Bool("v", false, "verbosity")
-var noop = flag.Bool("n", false, "don't actually compact")
+var verbose = flag.Bool("v", false, "verbose")
 
 const defaultTemplate = `{{.dbname}}:
   Space Used:       {{.info.SpaceUsed|bytes}}
@@ -49,6 +48,11 @@ var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 
 func init() {
 	log.SetFlags(log.Lmicroseconds)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %v [-v] http://serieslyhost:3133/ [dbnames...]\n",
+			os.Args[0])
+		flag.PrintDefaults()
+	}
 }
 
 func maybeFatal(err error, fmt string, args ...interface{}) {
