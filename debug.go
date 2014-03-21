@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"log"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/mschoch/gouchstore"
@@ -60,4 +62,46 @@ func debugListOpenDBs(parts []string, w http.ResponseWriter, req *http.Request) 
 	openConnLock.Unlock()
 
 	mustEncode(200, w, snap)
+}
+
+type queueMap struct {
+	m  map[string]int
+	mu sync.Mutex
+}
+
+func newQueueMap() *queueMap {
+	return &queueMap{m: map[string]int{}}
+}
+
+func (q *queueMap) set(name string, to int) {
+	q.mu.Lock()
+	q.m[name] = to
+	q.mu.Unlock()
+}
+
+func (q *queueMap) del(name string) {
+	q.mu.Lock()
+	delete(q.m, name)
+	q.mu.Unlock()
+}
+
+func (q *queueMap) String() string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	d, err := json.Marshal(q.m)
+	if err != nil {
+		log.Fatalf("Error marshaling queueMap: %v", err)
+	}
+	return string(d)
+}
+
+var dbQm = newQueueMap()
+
+func init() {
+	expvar.Publish("qm", dbQm)
+}
+
+func debugVars(parts []string, w http.ResponseWriter, req *http.Request) {
+	req.URL.Path = strings.Replace(req.URL.Path, "/_debug/vars", "/debug/vars", 1)
+	http.DefaultServeMux.ServeHTTP(w, req)
 }

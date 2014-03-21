@@ -71,6 +71,8 @@ func init() {
 			staticHandler, defaultDeadline},
 		routingEntry{"GET", regexp.MustCompile("^/_debug/open$"),
 			debugListOpenDBs, defaultDeadline},
+		routingEntry{"GET", regexp.MustCompile("^/_debug/vars"),
+			debugVars, defaultDeadline},
 		// Database stuff
 		routingEntry{"GET", regexp.MustCompile("^/_all_dbs$"),
 			listDatabases, defaultDeadline},

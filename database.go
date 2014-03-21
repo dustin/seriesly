@@ -100,6 +100,7 @@ func dbRemoveConn(dbname string) {
 		writer.Close()
 	}
 	delete(dbConns, dbname)
+	dbQm.del(dbname)
 }
 
 func dbCloseAll() {
@@ -183,6 +184,8 @@ func dbWriteLoop(dq *dbWriter) {
 	liveOps := 0
 
 	for {
+		dbQm.set(dq.dbname, queued)
+
 		select {
 		case <-dq.quit:
 			sdt := time.Now()
