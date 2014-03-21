@@ -102,6 +102,16 @@ func dbRemoveConn(dbname string) {
 	delete(dbConns, dbname)
 }
 
+func dbCloseAll() {
+	dbLock.Lock()
+	defer dbLock.Unlock()
+
+	for n, c := range dbConns {
+		log.Printf("Shutting down open conn %v", n)
+		c.Close()
+	}
+}
+
 func dbdelete(dbname string) error {
 	return os.Remove(dbPath(dbname))
 }
@@ -158,7 +168,11 @@ func dbCompact(dq *dbWriter, bulk gouchstore.BulkWriter, queued int,
 	return dq.db.Bulk(), nil
 }
 
+var dbWg = sync.WaitGroup{}
+
 func dbWriteLoop(dq *dbWriter) {
+	defer dbWg.Done()
+
 	queued := 0
 	bulk := dq.db.Bulk()
 
@@ -171,11 +185,12 @@ func dbWriteLoop(dq *dbWriter) {
 	for {
 		select {
 		case <-dq.quit:
+			sdt := time.Now()
 			bulk.Close()
 			bulk.Commit()
 			closeDBConn(dq.db)
 			dbRemoveConn(dq.dbname)
-			log.Printf("Closed %v", dq.dbname)
+			log.Printf("Closed %v in %v", dq.dbname, time.Since(sdt))
 			return
 		case <-liveTracker.C:
 			if queued == 0 && liveOps == 0 {
@@ -239,6 +254,7 @@ func dbWriteFun(dbname string) (*dbWriter, error) {
 		db,
 	}
 
+	dbWg.Add(1)
 	go dbWriteLoop(writer)
 
 	return writer, nil

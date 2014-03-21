@@ -76,7 +76,7 @@ func waitForMCConnections(ls net.Listener) {
 	}
 }
 
-func listenMC(bindaddr string) {
+func listenMC(bindaddr string) net.Listener {
 	ls, e := net.Listen("tcp", bindaddr)
 	if e != nil {
 		log.Fatalf("Error binding to memcached socket:  %s", e)
@@ -84,5 +84,6 @@ func listenMC(bindaddr string) {
 
 	log.Printf("Listening for memcached connections on %v", bindaddr)
 
-	waitForMCConnections(ls)
+	go waitForMCConnections(ls)
+	return ls
 }

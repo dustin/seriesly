@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"log"
 	"log/syslog"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
 	"runtime"
 	"runtime/pprof"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/dustin/gojson"
@@ -199,7 +202,32 @@ func startProfiler() {
 	} else {
 		log.Printf("Can't open profilefile")
 	}
+}
 
+// globalShutdownChan is closed when it's time to shut down.
+var globalShutdownChan = make(chan bool)
+
+func listener(addr string) net.Listener {
+	if addr == "" {
+		addr = ":http"
+	}
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("Error setting up listener: %v", err)
+	}
+	return l
+}
+
+func shutdownHandler(ls []net.Listener, ch <-chan os.Signal) {
+	s := <-ch
+	log.Printf("Shutting down on sig %v", s)
+	for _, l := range ls {
+		l.Close()
+	}
+	dbCloseAll()
+	time.AfterFunc(time.Minute, func() {
+		log.Fatalf("Timed out waiting for connections to close.")
+	})
 }
 
 func main() {
@@ -268,8 +296,9 @@ func main() {
 		go startProfiler()
 	}
 
+	listeners := []net.Listener{}
 	if *mcaddr != "" {
-		go listenMC(*mcaddr)
+		listeners = append(listeners, listenMC(*mcaddr))
 	}
 
 	s := &http.Server{
@@ -278,5 +307,17 @@ func main() {
 		ReadTimeout: 5 * time.Second,
 	}
 	log.Printf("Listening to web requests on %s", *addr)
-	log.Fatal(s.ListenAndServe())
+	l := listener(*addr)
+	listeners = append(listeners, l)
+
+	// Need signal handler to shut down listeners
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
+	go shutdownHandler(listeners, sigch)
+
+	err := s.Serve(l)
+	log.Printf("Web server finished with %v", err)
+
+	log.Printf("Waiting for databases to finish")
+	dbWg.Wait()
 }
