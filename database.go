@@ -190,7 +190,8 @@ func dbWriteLoop(dq *dbWriter) {
 			bulk.Commit()
 			closeDBConn(dq.db)
 			dbRemoveConn(dq.dbname)
-			log.Printf("Closed %v in %v", dq.dbname, time.Since(sdt))
+			log.Printf("Closed %v with %v items in %v",
+				dq.dbname, queued, time.Since(sdt))
 			return
 		case <-liveTracker.C:
 			if queued == 0 && liveOps == 0 {
