@@ -179,7 +179,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 	}
 	route, hparts := findHandler(req.Method, req.URL.Path)
-	defer yellow.DeadlineLog(route.Deadline, "%v:%v with deadlined at %v",
+	defer yellow.DeadlineLog(route.Deadline, "%v:%v deadlined at %v",
 		req.Method, req.URL.Path, route.Deadline).Done()
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
