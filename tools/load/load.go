@@ -35,6 +35,10 @@ func sendOne(u, k string, body []byte) {
 }
 
 func main() {
+	if len(os.Args) < 2 {
+		log.Fatalf("Usage:  gzip -dc backup.gz | %v http://seriesly:3133/dbname",
+			os.Args[0])
+	}
 	u := os.Args[1]
 	setupDb(u)
 
