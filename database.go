@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dustin/seriesly/timelib"
@@ -100,7 +101,6 @@ func dbRemoveConn(dbname string) {
 		writer.Close()
 	}
 	delete(dbConns, dbname)
-	dbQm.del(dbname)
 }
 
 func dbCloseAll() {
@@ -183,8 +183,12 @@ func dbWriteLoop(dq *dbWriter) {
 	defer liveTracker.Stop()
 	liveOps := 0
 
+	dbst := dbStats.getOrCreate(dq.dbname)
+	defer atomic.StoreUint32(&dbst.qlen, 0)
+	defer atomic.AddUint32(&dbst.closes, 1)
+
 	for {
-		dbQm.set(dq.dbname, queued)
+		atomic.StoreUint32(&dbst.qlen, uint32(queued))
 
 		select {
 		case <-dq.quit:
@@ -216,6 +220,7 @@ func dbWriteLoop(dq *dbWriter) {
 				var err error
 				bulk, err = dbCompact(dq, bulk, queued, qi)
 				qi.cherr <- err
+				atomic.AddUint64(&dbst.written, uint64(queued))
 				queued = 0
 			default:
 				log.Panicf("Unhandled case: %v", qi.op)
@@ -227,6 +232,7 @@ func dbWriteLoop(dq *dbWriter) {
 					log.Printf("Flush of %d items took %v",
 						queued, time.Since(start))
 				}
+				atomic.AddUint64(&dbst.written, uint64(queued))
 				queued = 0
 				t.Reset(*flushTime)
 			}
@@ -238,6 +244,7 @@ func dbWriteLoop(dq *dbWriter) {
 					log.Printf("Flush of %d items from timer took %v",
 						queued, time.Since(start))
 				}
+				atomic.AddUint64(&dbst.written, uint64(queued))
 				queued = 0
 			}
 			t.Reset(*flushTime)

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mschoch/gouchstore"
 )
@@ -64,28 +65,42 @@ func debugListOpenDBs(parts []string, w http.ResponseWriter, req *http.Request) 
 	mustEncode(200, w, snap)
 }
 
-type queueMap struct {
-	m  map[string]int
+type dbStat struct {
+	written             uint64
+	qlen, opens, closes uint32
+}
+
+func (d *dbStat) MarshalJSON() ([]byte, error) {
+	m := map[string]interface{}{}
+	m["written"] = atomic.LoadUint64(&d.written)
+	m["qlen"] = atomic.LoadUint32(&d.qlen)
+	m["opens"] = atomic.LoadUint32(&d.opens)
+	m["closes"] = atomic.LoadUint32(&d.closes)
+	return json.Marshal(m)
+}
+
+type databaseStats struct {
+	m  map[string]*dbStat
 	mu sync.Mutex
 }
 
-func newQueueMap() *queueMap {
-	return &queueMap{m: map[string]int{}}
+func newQueueMap() *databaseStats {
+	return &databaseStats{m: map[string]*dbStat{}}
 }
 
-func (q *queueMap) set(name string, to int) {
+func (q *databaseStats) getOrCreate(name string) *dbStat {
 	q.mu.Lock()
-	q.m[name] = to
-	q.mu.Unlock()
+	defer q.mu.Unlock()
+	rv, ok := q.m[name]
+	if !ok {
+		rv = &dbStat{}
+		q.m[name] = rv
+	}
+	atomic.AddUint32(&rv.opens, 1)
+	return rv
 }
 
-func (q *queueMap) del(name string) {
-	q.mu.Lock()
-	delete(q.m, name)
-	q.mu.Unlock()
-}
-
-func (q *queueMap) String() string {
+func (q *databaseStats) String() string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	d, err := json.Marshal(q.m)
@@ -95,10 +110,10 @@ func (q *queueMap) String() string {
 	return string(d)
 }
 
-var dbQm = newQueueMap()
+var dbStats = newQueueMap()
 
 func init() {
-	expvar.Publish("qm", dbQm)
+	expvar.Publish("dbs", dbStats)
 }
 
 func debugVars(parts []string, w http.ResponseWriter, req *http.Request) {
