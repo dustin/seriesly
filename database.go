@@ -189,8 +189,8 @@ func dbWriteLoop(dq *dbWriter) {
 		select {
 		case <-dq.quit:
 			sdt := time.Now()
-			bulk.Close()
 			bulk.Commit()
+			bulk.Close()
 			closeDBConn(dq.db)
 			dbRemoveConn(dq.dbname)
 			log.Printf("Closed %v with %v items in %v",
