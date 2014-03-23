@@ -87,7 +87,12 @@ func main() {
 		go compact(wg, *u, ch)
 	}
 
-	for _, db := range listDatabases(*u) {
+	dbs := flag.Args()[1:]
+	if len(dbs) == 0 {
+		dbs = listDatabases(*u)
+	}
+
+	for _, db := range dbs {
 		ch <- db
 	}
 	close(ch)
