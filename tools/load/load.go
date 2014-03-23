@@ -3,12 +3,17 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/dustin/seriesly/timelib"
 )
+
+var min = flag.String("min", "", "minimum timestamp (RFC3339)")
 
 func maybeFatal(err error) {
 	if err != nil {
@@ -34,13 +39,25 @@ func sendOne(u, k string, body []byte) {
 	}
 }
 
+func parseMinTime() time.Time {
+	tm, err := timelib.ParseTime(*min)
+	if err != nil {
+		tm = time.Time{}
+	}
+	return tm
+}
+
 func main() {
-	if len(os.Args) < 2 {
+	flag.Parse()
+
+	if flag.NArg() < 1 {
 		log.Fatalf("Usage:  gzip -dc backup.gz | %v http://seriesly:3133/dbname",
 			os.Args[0])
 	}
-	u := os.Args[1]
+	u := flag.Arg(0)
 	setupDb(u)
+
+	minTime := parseMinTime()
 
 	t := time.Tick(5 * time.Second)
 	i := 0
@@ -58,6 +75,12 @@ func main() {
 
 		var latestKey string
 		for k, v := range kv {
+			if !minTime.IsZero() {
+				thist, err := timelib.ParseTime(k)
+				if err == nil && minTime.After(thist) {
+					continue
+				}
+			}
 			body := []byte(*v)
 			sendOne(u, k, body)
 			latestKey = k
