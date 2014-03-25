@@ -5,15 +5,18 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"text/tabwriter"
 
 	"github.com/dustin/go-humanize"
 )
 
 var verbose = flag.Bool("v", false, "verbose")
+var short = flag.Bool("short", false, "short form")
 
 const defaultTemplate = `{{.dbname}}:
   Space Used:       {{.info.SpaceUsed|bytes}}
@@ -24,6 +27,8 @@ const defaultTemplate = `{{.dbname}}:
 
 `
 
+const shortTemplate = "{{.dbname}}\t{{.info.DocCount|comma}}\t{{.info.SpaceUsed|bytes}}\n"
+
 type dbinfo struct {
 	SpaceUsed    json.Number `json:"space_used"`
 	LastSeq      json.Number `json:"last_seq"`
@@ -33,7 +38,7 @@ type dbinfo struct {
 	Error        string
 }
 
-var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
+var funcMap = template.FuncMap{
 	"comma": func(n json.Number) string {
 		nint, err := n.Int64()
 		maybeFatal(err, "Invalid int64: %v: %v", n, err)
@@ -43,8 +48,11 @@ var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 		nint, err := n.Int64()
 		maybeFatal(err, "Invalid int64: %v: %v", n, err)
 		return humanize.Bytes(uint64(nint))
-	},
-}).Parse(defaultTemplate))
+	}}
+
+var tmpl = template.Must(template.New("").Funcs(funcMap).Parse(defaultTemplate))
+
+var shortTmpl = template.Must(template.New("").Funcs(funcMap).Parse(shortTemplate))
 
 func init() {
 	log.SetFlags(log.Lmicroseconds)
@@ -96,10 +104,14 @@ func vlog(s string, a ...interface{}) {
 	}
 }
 
-func describe(base url.URL, db string) {
+func describe(w io.Writer, base url.URL, db string) {
 	di, err := fetchDBInfo(base, db)
 	maybeFatal(err, "Couldn't fetch info for %v: %v", db, err)
-	tmpl.Execute(os.Stdout, map[string]interface{}{
+	t := tmpl
+	if *short {
+		t = shortTmpl
+	}
+	t.Execute(w, map[string]interface{}{
 		"dbname": db,
 		"info":   di,
 	})
@@ -121,7 +133,12 @@ func main() {
 		dbs = listDatabases(*base)
 	}
 
+	tw := tabwriter.NewWriter(os.Stdout, 8, 8, 2, ' ', 0)
+	if *short {
+		fmt.Fprintf(tw, "dbname\tdocs\tbytes\n-----\t-----\t-----\n")
+	}
+	defer tw.Flush()
 	for _, d := range dbs {
-		describe(*base, d)
+		describe(tw, *base, d)
 	}
 }
