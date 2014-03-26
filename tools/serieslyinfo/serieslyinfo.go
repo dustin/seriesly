@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -18,18 +17,23 @@ import (
 var verbose = flag.Bool("v", false, "verbose")
 var short = flag.Bool("short", false, "short form")
 
-const defaultTemplate = `{{.dbname}}:
-  Space Used:       {{.info.SpaceUsed|bytes}}
-  Last Sequence:    {{.info.SpaceUsed|comma}}
-  Header Position:  {{.info.HeaderPos|comma}}
-  Document Count:   {{.info.DocCount|comma}}
-  Deleted Count:    {{.info.DeletedCount|comma}}
-
+const defaultTemplate = `{{range .}}
+{{.DBName}}:
+  Space Used:       {{.SpaceUsed|bytes}}
+  Last Sequence:    {{.SpaceUsed|comma}}
+  Header Position:  {{.HeaderPos|comma}}
+  Document Count:   {{.DocCount|comma}}
+  Deleted Count:    {{.DeletedCount|comma}}
+{{end}}
 `
 
-const shortTemplate = "{{.dbname}}\t{{.info.DocCount|comma}}\t{{.info.SpaceUsed|bytes}}\n"
+const shortTemplate = `dbname	docs	space used
+------	----	----------
+{{range .}}{{.DBName}}	{{.DocCount|comma}}	{{.SpaceUsed|bytes}}
+{{end}}`
 
 type dbinfo struct {
+	DBName       string
 	SpaceUsed    json.Number `json:"space_used"`
 	LastSeq      json.Number `json:"last_seq"`
 	HeaderPos    json.Number `json:"header_pos"`
@@ -104,17 +108,18 @@ func vlog(s string, a ...interface{}) {
 	}
 }
 
-func describe(w io.Writer, base url.URL, db string) {
-	di, err := fetchDBInfo(base, db)
-	maybeFatal(err, "Couldn't fetch info for %v: %v", db, err)
-	t := tmpl
-	if *short {
-		t = shortTmpl
-	}
-	t.Execute(w, map[string]interface{}{
-		"dbname": db,
-		"info":   di,
-	})
+func describe(base url.URL, dbs ...string) <-chan dbinfo {
+	rv := make(chan dbinfo)
+	go func() {
+		defer close(rv)
+		for _, db := range dbs {
+			di, err := fetchDBInfo(base, db)
+			maybeFatal(err, "Couldn't fetch info for %v: %v", db, err)
+			di.DBName = db
+			rv <- di
+		}
+	}()
+	return rv
 }
 
 func main() {
@@ -133,12 +138,12 @@ func main() {
 		dbs = listDatabases(*base)
 	}
 
-	tw := tabwriter.NewWriter(os.Stdout, 8, 8, 2, ' ', 0)
+	t := tmpl
 	if *short {
-		fmt.Fprintf(tw, "dbname\tdocs\tbytes\n-----\t-----\t-----\n")
+		t = shortTmpl
 	}
+
+	tw := tabwriter.NewWriter(os.Stdout, 8, 8, 2, ' ', 0)
+	t.Execute(tw, describe(*base, dbs...))
 	defer tw.Flush()
-	for _, d := range dbs {
-		describe(tw, *base, d)
-	}
 }
