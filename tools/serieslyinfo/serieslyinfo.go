@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -14,8 +15,12 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-var verbose = flag.Bool("v", false, "verbose")
-var short = flag.Bool("short", false, "short form")
+var (
+	verbose      = flag.Bool("v", false, "verbose")
+	short        = flag.Bool("short", false, "short form")
+	templateSrc  = flag.String("t", "", "Display template")
+	templateFile = flag.String("T", "", "Display template filename")
+)
 
 const defaultTemplate = `{{range .}}
 {{.DBName}}:
@@ -53,10 +58,6 @@ var funcMap = template.FuncMap{
 		maybeFatal(err, "Invalid int64: %v: %v", n, err)
 		return humanize.Bytes(uint64(nint))
 	}}
-
-var tmpl = template.Must(template.New("").Funcs(funcMap).Parse(defaultTemplate))
-
-var shortTmpl = template.Must(template.New("").Funcs(funcMap).Parse(shortTemplate))
 
 func init() {
 	log.SetFlags(log.Lmicroseconds)
@@ -122,6 +123,28 @@ func describe(base url.URL, dbs ...string) <-chan dbinfo {
 	return rv
 }
 
+func getTemplate(tdefault string) *template.Template {
+	tmplstr := *templateSrc
+	if tmplstr == "" {
+		switch *templateFile {
+		case "":
+			tmplstr = tdefault
+		case "-":
+			td, err := ioutil.ReadAll(os.Stdin)
+			maybeFatal(err, "Error reading template from stdin: %v", err)
+			tmplstr = string(td)
+		default:
+			td, err := ioutil.ReadFile(*templateFile)
+			maybeFatal(err, "Error reading template file: %v", err)
+			tmplstr = string(td)
+		}
+	}
+
+	tmpl, err := template.New("").Funcs(funcMap).Parse(tmplstr)
+	maybeFatal(err, "Error parsing template: %v", err)
+	return tmpl
+}
+
 func main() {
 	flag.Parse()
 
@@ -138,12 +161,14 @@ func main() {
 		dbs = listDatabases(*base)
 	}
 
-	t := tmpl
+	tsrc := defaultTemplate
 	if *short {
-		t = shortTmpl
+		tsrc = shortTemplate
 	}
 
+	tmpl := getTemplate(tsrc)
+
 	tw := tabwriter.NewWriter(os.Stdout, 8, 8, 2, ' ', 0)
-	t.Execute(tw, describe(*base, dbs...))
+	tmpl.Execute(tw, describe(*base, dbs...))
 	defer tw.Flush()
 }
