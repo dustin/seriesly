@@ -22,13 +22,12 @@ import (
 
 var (
 	verbose     = flag.Bool("v", false, "verbosity")
-	concurrency = flag.Int("j", 2,
-		"number of concurrent dumps")
-	dbName    = flag.String("db", "", "which db to dump (default: all)")
-	noop      = flag.Bool("n", false, "if true, don't actually write dumps")
-	from      = flag.String("from", "", "oldest key to dump")
-	to        = flag.String("to", "", "newest key to dump")
-	formatStr = flag.String("format", "%n.json.gz", "dump name format")
+	concurrency = flag.Int("j", 2, "number of concurrent dumps")
+	dbName      = flag.String("db", "", "which db to dump (default: all)")
+	noop        = flag.Bool("n", false, "if true, don't actually write dumps")
+	from        = flag.String("from", "", "oldest key to dump")
+	to          = flag.String("to", "", "newest key to dump")
+	formatStr   = flag.String("format", "%n.json.gz", "dump name format")
 )
 
 const sigInfo = syscall.Signal(29)
