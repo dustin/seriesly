@@ -7,12 +7,11 @@ import (
 	"html/template"
 	"io/ioutil"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"text/tabwriter"
 
 	"github.com/dustin/go-humanize"
+	"github.com/dustin/seriesly/serieslyclient"
 )
 
 var (
@@ -36,16 +35,6 @@ const shortTemplate = `dbname	docs	space used
 ------	----	----------
 {{range .}}{{.DBName}}	{{.DocCount|comma}}	{{.SpaceUsed|bytes}}
 {{end}}`
-
-type dbinfo struct {
-	DBName       string
-	SpaceUsed    json.Number `json:"space_used"`
-	LastSeq      json.Number `json:"last_seq"`
-	HeaderPos    json.Number `json:"header_pos"`
-	DocCount     json.Number `json:"doc_count"`
-	DeletedCount json.Number `json:"deleted_count"`
-	Error        string
-}
 
 var funcMap = template.FuncMap{
 	"comma": func(n json.Number) string {
@@ -74,47 +63,18 @@ func maybeFatal(err error, fmt string, args ...interface{}) {
 	}
 }
 
-func listDatabases(u url.URL) []string {
-	u.Path = "/_all_dbs"
-	res, err := http.Get(u.String())
-	maybeFatal(err, "Error listing databases: %v", err)
-	defer res.Body.Close()
-
-	rv := []string{}
-	d := json.NewDecoder(res.Body)
-	err = d.Decode(&rv)
-	maybeFatal(err, "Error decoding database list: %v", err)
-	return rv
-}
-
-func fetchDBInfo(u url.URL, which string) (dbinfo, error) {
-	u.Path = "/" + which
-	rv := dbinfo{}
-	res, err := http.Get(u.String())
-	if err != nil {
-		return rv, err
-	}
-	if res.StatusCode != 200 {
-		return rv, fmt.Errorf("HTTP error:  %v", res.Status)
-	}
-	defer res.Body.Close()
-
-	err = json.NewDecoder(res.Body).Decode(&rv)
-	return rv, err
-}
-
 func vlog(s string, a ...interface{}) {
 	if *verbose {
 		log.Printf(s, a...)
 	}
 }
 
-func describe(base url.URL, dbs ...string) <-chan dbinfo {
-	rv := make(chan dbinfo)
+func describe(s *serieslyclient.Seriesly, dbs ...string) <-chan *serieslyclient.DBInfo {
+	rv := make(chan *serieslyclient.DBInfo)
 	go func() {
 		defer close(rv)
 		for _, db := range dbs {
-			di, err := fetchDBInfo(base, db)
+			di, err := s.Info(db)
 			maybeFatal(err, "Couldn't fetch info for %v: %v", db, err)
 			di.DBName = db
 			rv <- di
@@ -153,12 +113,13 @@ func main() {
 		os.Exit(64)
 	}
 
-	base, err := url.Parse(flag.Arg(0))
-	maybeFatal(err, "Couldn't parse URL: %v", err)
+	s, err := serieslyclient.New(flag.Arg(0))
+	maybeFatal(err, "Couldn't set up client: %v", err)
 
 	dbs := flag.Args()[1:]
 	if len(dbs) == 0 {
-		dbs = listDatabases(*base)
+		dbs, err = s.List()
+		maybeFatal(err, "Error listing DBs: %v", err)
 	}
 
 	tsrc := defaultTemplate
@@ -169,6 +130,6 @@ func main() {
 	tmpl := getTemplate(tsrc)
 
 	tw := tabwriter.NewWriter(os.Stdout, 8, 8, 2, ' ', 0)
-	tmpl.Execute(tw, describe(*base, dbs...))
+	tmpl.Execute(tw, describe(s, dbs...))
 	defer tw.Flush()
 }
