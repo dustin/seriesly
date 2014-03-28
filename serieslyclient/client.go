@@ -68,3 +68,22 @@ func (s *Seriesly) Info(dbname string) (*DBInfo, error) {
 	err = json.NewDecoder(res.Body).Decode(rv)
 	return rv, err
 }
+
+// Compact the given database.
+func (s *Seriesly) Compact(db string) error {
+	u := *s.u
+	u.Path = fmt.Sprintf("/%v/_compact", db)
+	req, err := http.NewRequest("POST", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	res.Body.Close()
+	if res.StatusCode != 200 {
+		return fmt.Errorf("HTTP error compacting: %v", res.Status)
+	}
+	return nil
+}
