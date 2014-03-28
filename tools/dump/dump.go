@@ -2,7 +2,6 @@ package main
 
 import (
 	"compress/gzip"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/httputil"
+	"github.com/dustin/seriesly/serieslyclient"
 	"github.com/dustin/seriesly/timelib"
 )
 
@@ -48,19 +48,6 @@ func checkTime(which, ts string) string {
 		log.Fatalf("Error parsing %q value: %v", which, err)
 	}
 	return strconv.FormatInt(t.UnixNano(), 10)
-}
-
-func listDatabases(u url.URL) []string {
-	u.Path = "/_all_dbs"
-	res, err := http.Get(u.String())
-	maybeFatal(err, "Error listing databases: %v", err)
-	defer res.Body.Close()
-
-	rv := []string{}
-	d := json.NewDecoder(res.Body)
-	err = d.Decode(&rv)
-	maybeFatal(err, "Error decoding database list: %v", err)
-	return rv
 }
 
 func vlog(s string, a ...interface{}) {
@@ -101,13 +88,14 @@ func dumpOne(dbname, u string, t time.Time) (int64, error) {
 	return io.Copy(z, res.Body)
 }
 
-func dump(wg *sync.WaitGroup, u url.URL, ch <-chan string) {
+func dump(wg *sync.WaitGroup, s *serieslyclient.Seriesly, ch <-chan string) {
 	defer wg.Done()
 
 	t := time.Now()
 	for db := range ch {
 		start := time.Now()
 		vlog("Dumping %v", db)
+		u := s.URL()
 		u.Path = "/" + db + "/_dump"
 		params := url.Values{}
 		if *from != "" {
@@ -138,7 +126,7 @@ func main() {
 		log.Fatalf("Seriesly URL required")
 	}
 
-	u, err := url.Parse(flag.Arg(0))
+	s, err := serieslyclient.New(flag.Arg(0))
 	maybeFatal(err, "Parsing %v: %v", flag.Arg(0), err)
 
 	wg := &sync.WaitGroup{}
@@ -146,11 +134,13 @@ func main() {
 
 	for i := 0; i < *concurrency; i++ {
 		wg.Add(1)
-		go dump(wg, *u, ch)
+		go dump(wg, s, ch)
 	}
 
 	if *dbName == "" {
-		for _, db := range listDatabases(*u) {
+		dbs, err := s.List()
+		maybeFatal(err, "Error listing: %v", err)
+		for _, db := range dbs {
 			ch <- db
 		}
 	} else {

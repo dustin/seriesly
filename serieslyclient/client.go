@@ -33,6 +33,12 @@ type DBInfo struct {
 	Error        string
 }
 
+// URL returns a copy of the Seriesly client's URL.
+func (s *Seriesly) URL() *url.URL {
+	rv := *s.u
+	return &rv
+}
+
 // List all databases.
 func (s *Seriesly) List() ([]string, error) {
 	u := *s.u
