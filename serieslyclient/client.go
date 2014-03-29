@@ -4,8 +4,12 @@ package serieslyclient
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+
+	"github.com/dustin/seriesly/timelib"
 )
 
 // A Seriesly DB.
@@ -92,4 +96,47 @@ func (s *Seriesly) Compact(db string) error {
 		return fmt.Errorf("HTTP error compacting: %v", res.Status)
 	}
 	return nil
+}
+
+func setTimeParam(uv url.Values, name, val string) error {
+	if val == "" {
+		return nil
+	}
+	t, err := timelib.ParseTime(val)
+	if err != nil {
+		return err
+	}
+	uv.Set(name, strconv.FormatInt(t.UnixNano(), 10))
+	return nil
+}
+
+// Dump a database or range of a database to a Writer.
+//
+// db is the name of the db to dump
+// from and to are both optional and will be parsed as a seriesly
+// timestamp.
+func (s *Seriesly) Dump(w io.Writer, db, from, to string) (int64, error) {
+	u := *s.u
+	u.Path = "/" + db + "/_dump"
+	params := url.Values{}
+	if err := setTimeParam(params, "from", from); err != nil {
+		return 0, err
+	}
+	if err := setTimeParam(params, "to", to); err != nil {
+		return 0, err
+	}
+
+	u.RawQuery = params.Encode()
+
+	res, err := http.Get(u.String())
+	if err != nil {
+		return 0, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return 0, fmt.Errorf("HTTP Error: %v", res.Status)
+	}
+
+	return io.Copy(w, res.Body)
 }

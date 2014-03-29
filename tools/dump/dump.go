@@ -3,13 +3,9 @@ package main
 import (
 	"compress/gzip"
 	"flag"
-	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -17,7 +13,6 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/httputil"
 	"github.com/dustin/seriesly/serieslyclient"
-	"github.com/dustin/seriesly/timelib"
 )
 
 var (
@@ -42,14 +37,6 @@ func maybeFatal(err error, fmt string, args ...interface{}) {
 	}
 }
 
-func checkTime(which, ts string) string {
-	t, err := timelib.ParseTime(ts)
-	if err != nil {
-		log.Fatalf("Error parsing %q value: %v", which, err)
-	}
-	return strconv.FormatInt(t.UnixNano(), 10)
-}
-
 func vlog(s string, a ...interface{}) {
 	if *verbose {
 		log.Printf(s, a...)
@@ -62,20 +49,7 @@ func compress(w io.Writer) io.WriteCloser {
 	return z
 }
 
-func dumpOne(dbname, u string, t time.Time) (int64, error) {
-	if *noop {
-		return 0, nil
-	}
-	res, err := http.Get(u)
-	if err != nil {
-		return 0, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		return 0, fmt.Errorf("HTTP Error: %v", res.Status)
-	}
-
+func dumpOne(s *serieslyclient.Seriesly, dbname string, t time.Time) (int64, error) {
 	fn := format(*formatStr, dbname, t)
 	outf, err := os.Create(fn)
 	if err != nil {
@@ -85,7 +59,8 @@ func dumpOne(dbname, u string, t time.Time) (int64, error) {
 
 	z := compress(outf)
 	defer z.Close()
-	return io.Copy(z, res.Body)
+
+	return s.Dump(z, dbname, *from, *to)
 }
 
 func dump(wg *sync.WaitGroup, s *serieslyclient.Seriesly, ch <-chan string) {
@@ -95,20 +70,8 @@ func dump(wg *sync.WaitGroup, s *serieslyclient.Seriesly, ch <-chan string) {
 	for db := range ch {
 		start := time.Now()
 		vlog("Dumping %v", db)
-		u := s.URL()
-		u.Path = "/" + db + "/_dump"
-		params := url.Values{}
-		if *from != "" {
-			params.Set("from", checkTime("from", *from))
-		}
-		if *to != "" {
-			params.Set("to", checkTime("to", *to))
-		}
-
-		u.RawQuery = params.Encode()
-
-		n, err := dumpOne(db, u.String(), t)
-		maybeFatal(err, "Error dumping %v: %v", u.String(), err)
+		n, err := dumpOne(s, db, t)
+		maybeFatal(err, "Error dumping %v: %v", db, err)
 
 		if !*noop {
 			vlog("Dumped %v of %v in %v",
