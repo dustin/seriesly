@@ -14,16 +14,23 @@ import (
 
 // A Seriesly DB.
 type Seriesly struct {
-	u *url.URL
+	u      *url.URL
+	client *http.Client
 }
 
 // New creates a new Seriesly instance for the given URL.
 func New(u string) (*Seriesly, error) {
+	return NewWithClient(u, http.DefaultClient)
+}
+
+// NewWithClient creates a new Seriesly instance with the specified
+// HTTP client.
+func NewWithClient(u string, client *http.Client) (*Seriesly, error) {
 	rvu, err := url.Parse(u)
 	if err != nil {
 		return nil, err
 	}
-	return &Seriesly{rvu}, nil
+	return &Seriesly{rvu, client}, nil
 }
 
 // DBInfo represents database info.
@@ -47,7 +54,7 @@ func (s *Seriesly) URL() *url.URL {
 func (s *Seriesly) List() ([]string, error) {
 	u := *s.u
 	u.Path = "/_all_dbs"
-	res, err := http.Get(u.String())
+	res, err := s.client.Get(u.String())
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +73,7 @@ func (s *Seriesly) Info(dbname string) (*DBInfo, error) {
 	u := *s.u
 	u.Path = "/" + dbname
 	rv := &DBInfo{}
-	res, err := http.Get(u.String())
+	res, err := s.client.Get(u.String())
 	if err != nil {
 		return rv, err
 	}
@@ -87,7 +94,7 @@ func (s *Seriesly) Compact(db string) error {
 	if err != nil {
 		return err
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := s.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -128,7 +135,7 @@ func (s *Seriesly) Dump(w io.Writer, db, from, to string) (int64, error) {
 
 	u.RawQuery = params.Encode()
 
-	res, err := http.Get(u.String())
+	res, err := s.client.Get(u.String())
 	if err != nil {
 		return 0, err
 	}
