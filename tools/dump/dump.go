@@ -49,8 +49,8 @@ func compress(w io.Writer) io.WriteCloser {
 	return z
 }
 
-func dumpOne(s *serieslyclient.Seriesly, dbname string, t time.Time) (int64, error) {
-	fn := format(*formatStr, dbname, t)
+func dumpOne(s *serieslyclient.SerieslyDB, t time.Time) (int64, error) {
+	fn := format(*formatStr, s.Name(), t)
 	outf, err := os.Create(fn)
 	if err != nil {
 		return 0, err
@@ -60,7 +60,7 @@ func dumpOne(s *serieslyclient.Seriesly, dbname string, t time.Time) (int64, err
 	z := compress(outf)
 	defer z.Close()
 
-	return s.Dump(z, dbname, *from, *to)
+	return s.Dump(z, *from, *to)
 }
 
 func dump(wg *sync.WaitGroup, s *serieslyclient.Seriesly, ch <-chan string) {
@@ -70,7 +70,7 @@ func dump(wg *sync.WaitGroup, s *serieslyclient.Seriesly, ch <-chan string) {
 	for db := range ch {
 		start := time.Now()
 		vlog("Dumping %v", db)
-		n, err := dumpOne(s, db, t)
+		n, err := dumpOne(s.DB(db), t)
 		maybeFatal(err, "Error dumping %v: %v", db, err)
 
 		if !*noop {

@@ -74,7 +74,7 @@ func describe(s *serieslyclient.Seriesly, dbs ...string) <-chan *serieslyclient.
 	go func() {
 		defer close(rv)
 		for _, db := range dbs {
-			di, err := s.Info(db)
+			di, err := s.DB(db).Info()
 			maybeFatal(err, "Couldn't fetch info for %v: %v", db, err)
 			di.DBName = db
 			rv <- di

@@ -37,7 +37,7 @@ func compact(wg *sync.WaitGroup, s *serieslyclient.Seriesly, ch <-chan string) {
 		start := time.Now()
 		vlog("Compacting %v", db)
 		if !*noop {
-			s.Compact(db)
+			s.DB(db).Compact()
 		}
 		vlog("Finished compacting %v in %v", db, time.Since(start))
 	}
