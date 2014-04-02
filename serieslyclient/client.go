@@ -68,3 +68,41 @@ func (s *Seriesly) List() ([]string, error) {
 func (s *Seriesly) DB(db string) *SerieslyDB {
 	return &SerieslyDB{s, db}
 }
+
+// Create creates a new database.
+func (s *Seriesly) Create(db string) error {
+	u := *s.u
+	u.Path = "/" + db
+	req, err := http.NewRequest("PUT", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	res, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 201 {
+		return fmt.Errorf("HTTP Error creating DB: %v", res.Status)
+	}
+	return nil
+}
+
+// Delete destroys a database.
+func (s *Seriesly) Delete(db string) error {
+	u := *s.u
+	u.Path = "/" + db
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	res, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return fmt.Errorf("HTTP Error deleting DB: %v", res.Status)
+	}
+	return nil
+}
