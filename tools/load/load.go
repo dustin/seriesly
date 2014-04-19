@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/dustin/httputil"
 	"github.com/dustin/seriesly/timelib"
 )
 
@@ -54,6 +55,9 @@ func main() {
 		log.Fatalf("Usage:  gzip -dc backup.gz | %v http://seriesly:3133/dbname",
 			os.Args[0])
 	}
+
+	httputil.InitHTTPTracker(false)
+
 	u := flag.Arg(0)
 	setupDb(u)
 
