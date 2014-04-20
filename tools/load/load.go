@@ -65,6 +65,7 @@ func main() {
 
 	t := time.Tick(5 * time.Second)
 	i := 0
+	var latestKey string
 
 	d := json.NewDecoder(os.Stdin)
 	for {
@@ -72,12 +73,12 @@ func main() {
 
 		err := d.Decode(&kv)
 		if err == io.EOF {
-			log.Printf("Done!")
+			log.Printf("Done!  Processed %v items. Last was %v",
+				i, latestKey)
 			break
 		}
 		maybeFatal(err)
 
-		var latestKey string
 		for k, v := range kv {
 			if !minTime.IsZero() {
 				thist, err := timelib.ParseTime(k)
