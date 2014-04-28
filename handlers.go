@@ -172,16 +172,8 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	defer close(q.out)
 	defer close(q.cherr)
 
-	output := io.Writer(w)
-
-	if canGzip(req) {
-		w.Header().Set("Content-Encoding", "gzip")
-		gz := gzip.NewWriter(w)
-		defer gz.Close()
-		output = gz
-	} else {
-		output = w
-	}
+	output := newGzippingWriter(w, req)
+	defer output.Close()
 
 	going := true
 	finished := int32(0)
@@ -310,6 +302,33 @@ func compact(parts []string, w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+type gzippingWriter struct {
+	underlying http.ResponseWriter
+	gz         *gzip.Writer
+	output     io.Writer
+}
+
+func newGzippingWriter(w http.ResponseWriter, req *http.Request) *gzippingWriter {
+	rv := &gzippingWriter{underlying: w, output: w}
+	if canGzip(req) {
+		w.Header().Set("Content-Encoding", "gzip")
+		rv.gz = gzip.NewWriter(rv.underlying)
+		rv.output = rv.gz
+	}
+	return rv
+}
+
+func (g *gzippingWriter) Write(b []byte) (int, error) {
+	return g.output.Write(b)
+}
+
+func (g *gzippingWriter) Close() error {
+	if g.gz != nil {
+		return g.gz.Close()
+	}
+	return nil
+}
+
 func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 	// Parse the params
 
@@ -331,16 +350,8 @@ func allDocs(args []string, w http.ResponseWriter, req *http.Request) {
 		limit = 2000000000
 	}
 
-	output := io.Writer(w)
-
-	if canGzip(req) {
-		w.Header().Set("Content-Encoding", "gzip")
-		gz := gzip.NewWriter(w)
-		defer gz.Close()
-		output = gz
-	} else {
-		output = w
-	}
+	output := newGzippingWriter(w, req)
+	defer output.Close()
 	w.WriteHeader(200)
 
 	output.Write([]byte{'{'})
@@ -389,16 +400,8 @@ func dumpDocs(args []string, w http.ResponseWriter, req *http.Request) {
 		limit = 2000000000
 	}
 
-	output := io.Writer(w)
-
-	if canGzip(req) {
-		w.Header().Set("Content-Encoding", "gzip")
-		gz := gzip.NewWriter(w)
-		defer gz.Close()
-		output = gz
-	} else {
-		output = w
-	}
+	output := newGzippingWriter(w, req)
+	defer output.Close()
 	w.WriteHeader(200)
 
 	walked := 0
