@@ -172,8 +172,8 @@ func query(args []string, w http.ResponseWriter, req *http.Request) {
 	defer close(q.out)
 	defer close(q.cherr)
 
-	output := newGzippingWriter(w, req)
-	defer output.Close()
+	output := io.Writer(newGzippingWriter(w, req))
+	defer output.(io.Closer).Close()
 
 	going := true
 	finished := int32(0)
