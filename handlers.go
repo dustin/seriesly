@@ -110,11 +110,6 @@ func cleanupRangeParam(in, def string) (string, error) {
 	return t.UTC().Format(time.RFC3339Nano), nil
 }
 
-func canGzip(req *http.Request) bool {
-	acceptable := req.Header.Get("accept-encoding")
-	return strings.Contains(acceptable, "gzip")
-}
-
 func query(args []string, w http.ResponseWriter, req *http.Request) {
 	// Parse the params
 
@@ -302,17 +297,21 @@ func compact(parts []string, w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func canGzip(req *http.Request) bool {
+	acceptable := req.Header.Get("accept-encoding")
+	return strings.Contains(acceptable, "gzip")
+}
+
 type gzippingWriter struct {
-	underlying http.ResponseWriter
-	gz         *gzip.Writer
-	output     io.Writer
+	gz     *gzip.Writer
+	output io.Writer
 }
 
 func newGzippingWriter(w http.ResponseWriter, req *http.Request) *gzippingWriter {
-	rv := &gzippingWriter{underlying: w, output: w}
+	rv := &gzippingWriter{output: w}
 	if canGzip(req) {
 		w.Header().Set("Content-Encoding", "gzip")
-		rv.gz = gzip.NewWriter(rv.underlying)
+		rv.gz = gzip.NewWriter(w)
 		rv.output = rv.gz
 	}
 	return rv
