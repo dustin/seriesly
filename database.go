@@ -114,6 +114,7 @@ func dbCloseAll() {
 }
 
 func dbdelete(dbname string) error {
+	dbRemoveConn(dbname)
 	return os.Remove(dbPath(dbname))
 }
 
