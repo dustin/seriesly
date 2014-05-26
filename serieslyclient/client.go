@@ -3,9 +3,10 @@ package serieslyclient
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
+
+	"github.com/dustin/httputil"
 )
 
 // A Seriesly DB.
@@ -56,7 +57,7 @@ func (s *Seriesly) List() ([]string, error) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("HTTP error: %v", err)
+		return nil, httputil.HTTPError(res)
 	}
 
 	rv := []string{}
@@ -83,7 +84,7 @@ func (s *Seriesly) Create(db string) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 201 {
-		return fmt.Errorf("HTTP Error creating DB: %v", res.Status)
+		return httputil.HTTPErrorf(res, "Error creating DB: %S -- %B")
 	}
 	return nil
 }
@@ -102,7 +103,7 @@ func (s *Seriesly) Delete(db string) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return fmt.Errorf("HTTP Error deleting DB: %v", res.Status)
+		return httputil.HTTPErrorf(res, "Error deleting DB: %S -- %B")
 	}
 	return nil
 }
