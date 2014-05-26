@@ -38,6 +38,7 @@ func (q *Query) validate() error {
 			return fmt.Errorf("Invalid reducer: %v", f.Reducer)
 		}
 	}
+	return nil
 }
 
 func validReducer(r string) bool {
@@ -47,7 +48,7 @@ func validReducer(r string) bool {
 // Params converts this Query to query parameters.
 func (q *Query) Params() url.Values {
 	rv := url.Values{}
-	rv.Set("group", strconv.FormatUint(int64(q.Group/time.Millisecond), 10))
+	rv.Set("group", strconv.FormatUint(uint64(q.Group/time.Millisecond), 10))
 	if !q.From.IsZero() {
 		rv.Set("from", q.From.Format(time.RFC3339Nano))
 	}
