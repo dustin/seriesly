@@ -36,7 +36,7 @@ func sendOne(u, k string, body []byte) {
 	maybeFatal(err)
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
-		log.Fatalf("HTTP Error on %v: %v", k, err)
+		log.Fatal(httputil.HTTPErrorf(resp, "error on %v: %S -- %B", k))
 	}
 }
 

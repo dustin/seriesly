@@ -2,12 +2,12 @@ package serieslyclient
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 
+	"github.com/dustin/httputil"
 	"github.com/dustin/seriesly/timelib"
 )
 
@@ -37,7 +37,7 @@ func (s *SerieslyDB) Info() (*DBInfo, error) {
 		return rv, err
 	}
 	if res.StatusCode != 200 {
-		return rv, fmt.Errorf("HTTP error:  %v", res.Status)
+		return rv, httputil.HTTPError(res)
 	}
 	defer res.Body.Close()
 
@@ -58,7 +58,7 @@ func (s *SerieslyDB) Compact() error {
 	}
 	res.Body.Close()
 	if res.StatusCode != 200 {
-		return fmt.Errorf("HTTP error compacting: %v", res.Status)
+		return httputil.HTTPErrorf(res, "error compacting: %S -- %B")
 	}
 	return nil
 }
@@ -100,7 +100,7 @@ func (s *SerieslyDB) Dump(w io.Writer, from, to string) (int64, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return 0, fmt.Errorf("HTTP Error: %v", res.Status)
+		return 0, httputil.HTTPError(res)
 	}
 
 	return io.Copy(w, res.Body)
