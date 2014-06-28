@@ -58,7 +58,7 @@ func poll(tourl, fromurl string, t time.Time) {
 		log.Printf("Copying from %v to %v", fromurl, tourl)
 		defer func() { log.Printf("Finished copy in %v", time.Since(t)) }()
 	}
-	du := mustParseUrl(tourl)
+	du := mustParseURL(tourl)
 	du.RawQuery = "ts=" + strconv.FormatInt(t.UnixNano(), 10)
 
 	if err := httpCopy(du.String(), fromurl); err != nil {
@@ -66,7 +66,7 @@ func poll(tourl, fromurl string, t time.Time) {
 	}
 }
 
-func mustParseUrl(ustr string) *url.URL {
+func mustParseURL(ustr string) *url.URL {
 	u, e := url.Parse(ustr)
 	if e != nil {
 		log.Fatalf("Error parsing URL %q: %v", ustr, e)
@@ -74,7 +74,7 @@ func mustParseUrl(ustr string) *url.URL {
 	return u
 }
 
-func initHttp() {
+func initHTTP() {
 	http.DefaultClient = &http.Client{
 		Transport: &http.Transport{
 			DisableKeepAlives:     true,
@@ -93,7 +93,7 @@ func main() {
 
 	fromurl, tourl := flag.Arg(0), flag.Arg(1)
 
-	initHttp()
+	initHTTP()
 
 	poll(tourl, fromurl, time.Now())
 	if *pollFreq > 0 {
